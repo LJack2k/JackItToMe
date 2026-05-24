@@ -1,0 +1,151 @@
+plugins {
+    id 'java-library'
+    id 'maven-publish'
+    // ModDevGradle — the modern way to develop NeoForge mods. Check
+    // https://github.com/neoforged/ModDevGradle for the latest version.
+    id 'net.neoforged.moddev' version '1.0.20'
+}
+
+version = mod_version
+group = mod_group_id
+
+java {
+    toolchain.languageVersion = JavaLanguageVersion.of(21)
+    withSourcesJar()
+}
+
+base {
+    archivesName = mod_id
+}
+
+repositories {
+    mavenCentral()
+    maven {
+        name = 'NeoForged'
+        url = 'https://maven.neoforged.net/releases'
+    }
+    maven {
+        name = 'ParchmentMC'
+        url = 'https://maven.parchmentmc.org/'
+    }
+    // CurseMaven — public proxy for CurseForge mod files. Single source for all
+    // our mod-specific deps (JEI, AE2, RS). Look up coordinates per file via the
+    // CurseForge file page's "Curse Maven Snippet" panel.
+    maven {
+        name = 'CurseMaven'
+        url = 'https://www.cursemaven.com'
+        content {
+            includeGroup 'curse.maven'
+        }
+    }
+    // BlameJared maven — alternative source for JEI if CurseMaven is unavailable.
+    // maven { name = 'BlameJared (JEI)'; url = 'https://maven.blamejared.com' }
+
+    // Local jars fallback — drop jars into libs/ if you need a version CurseMaven
+    // doesn't have or want to test against a build that isn't on CurseForge.
+    flatDir {
+        dirs 'libs'
+    }
+    // modmaven.dev only hosts AE2 up to 19.0.4. Re-enable if you ever want older AE2.
+    // maven { name = 'Modmaven (AE2)'; url = 'https://modmaven.dev' }
+    //
+    // Refined Mods maven — only needed if you re-enable RS runtimeOnly.
+    // maven { name = 'Refined Mods'; url = 'https://maven.refinedmods.com/releases' }
+}
+
+neoForge {
+    version = neo_version
+
+    // Parchment mappings are optional — they give nicer parameter names in
+    // decompiled Minecraft code but the mod compiles fine without them. Re-enable
+    // once you've picked a real version from:
+    //   https://maven.parchmentmc.org/org/parchmentmc/data/parchment-1.21/
+    // (Browse the URL in a web browser to see the version directories.)
+    //
+    // parchment {
+    //     mappingsVersion = parchment_mappings_version
+    //     minecraftVersion = parchment_minecraft_version
+    // }
+
+    runs {
+        client {
+            client()
+            systemProperty 'forge.logging.markers', 'REGISTRIES'
+            systemProperty 'forge.logging.console.level', 'debug'
+            // Launch at near-full-screen size. There's no actual "maximize"
+            // program arg in Minecraft, but matching your monitor resolution
+            // (minus title-bar height) gets the same effect. Adjust to your
+            // own display if 1920x1040 doesn't match.
+            //
+            // Alternatives:
+            //   programArguments.add '--fullscreen'   // true fullscreen, no title bar
+            //   programArguments.addAll '--width', '2560', '--height', '1400'  // 1440p monitor
+            programArguments.addAll '--width', '1920', '--height', '1000'
+        }
+        server {
+            server()
+            programArgument '--nogui'
+        }
+        data {
+            data()
+            programArguments.addAll '--mod', mod_id, '--all', '--output', file('src/generated/resources/').getAbsolutePath()
+        }
+    }
+
+    mods {
+        "${mod_id}" {
+            sourceSet sourceSets.main
+        }
+    }
+}
+
+dependencies {
+    // All three deps come from CurseMaven. Coordinate format:
+    //   curse.maven:<slug>-<projectId>:<fileId>
+    // The slug-projectId pair is stable per mod; the fileId is per-release.
+    // To bump versions: open the CurseForge file page, copy "Curse Maven Snippet",
+    // and update gradle.properties.
+
+    // ---- JEI (required for the recipe screen to exist; client-only at runtime) ----
+    compileOnly "curse.maven:jei-238222:${jei_curse_file_id}"
+    runtimeOnly "curse.maven:jei-238222:${jei_curse_file_id}"
+
+    // ---- AE2 (optional integration) ----
+    // guideme is a transitive dep that AE2 needs at runtime. compileOnly is
+    // skipped because our code never touches guideme classes.
+    compileOnly "curse.maven:applied-energistics-2-223794:${ae2_curse_file_id}"
+    runtimeOnly "curse.maven:applied-energistics-2-223794:${ae2_curse_file_id}"
+    runtimeOnly "curse.maven:guideme-1173950:${guideme_curse_file_id}"
+
+    // ---- Refined Storage (optional integration) ----
+    // NOTE: RsItemSource.java is still stubbed with reflective lookups. The dep
+    // is here so you can replace the stubs with direct API calls; runtime
+    // inclusion lets you test in-game once the stubs are filled in.
+    compileOnly "curse.maven:refined-storage-243076:${rs_curse_file_id}"
+    runtimeOnly "curse.maven:refined-storage-243076:${rs_curse_file_id}"
+}
+
+tasks.named('processResources', ProcessResources).configure {
+    var replaceProperties = [
+        minecraft_version       : minecraft_version,
+        minecraft_version_range : minecraft_version_range,
+        neo_version             : neo_version,
+        neo_version_range       : neo_version_range,
+        loader_version_range    : loader_version_range,
+        mod_id                  : mod_id,
+        mod_name                : mod_name,
+        mod_license             : mod_license,
+        mod_version             : mod_version,
+        mod_authors             : mod_authors,
+        mod_description         : mod_description
+    ]
+    inputs.properties replaceProperties
+
+    filesMatching(['META-INF/neoforge.mods.toml']) {
+        expand replaceProperties
+    }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+}

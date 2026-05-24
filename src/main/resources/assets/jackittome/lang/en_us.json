@@ -1,0 +1,7 @@
+{
+    "jackittome.feedback.pulled": "Jacked %s items into your inventory",
+    "jackittome.feedback.nothing_available": "Nothing matching available here",
+
+    "key.categories.jackittome": "JackItToMe",
+    "key.jackittome.jack_hovered": "Jack hovered item"
+}

@@ -1,0 +1,25 @@
+# Gradle
+.gradle/
+build/
+out/
+src/generated/
+
+# NeoForge dev environment
+run/
+runs/
+
+# IDE
+.idea/
+*.iml
+.vscode/
+.project
+.classpath
+.settings/
+
+# Local jars dropped into libs/ for inspection or offline use.
+# Keeps libs/README.md tracked so the folder's purpose is documented.
+libs/*.jar
+
+# OS
+.DS_Store
+Thumbs.db
