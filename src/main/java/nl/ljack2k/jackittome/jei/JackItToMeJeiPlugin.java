@@ -3,14 +3,22 @@ package nl.ljack2k.jackittome.jei;
 import nl.ljack2k.jackittome.JackItToMe;
 import mezz.jei.api.IModPlugin;
 import mezz.jei.api.JeiPlugin;
+import mezz.jei.api.constants.RecipeTypes;
+import mezz.jei.api.recipe.RecipeType;
+import mezz.jei.api.registration.IAdvancedRegistration;
 import mezz.jei.api.runtime.IJeiRuntime;
 import net.minecraft.resources.ResourceLocation;
 
 /**
- * Minimal JEI plugin. We don't add categories or transfer handlers here — JEI's
- * own "+" button stays untouched. What we do is grab the {@link IJeiRuntime}
- * reference so the client-side button can ask JEI "what's the currently
- * displayed recipe?" when it needs to build the ingredient list for the packet.
+ * JEI plugin. Two responsibilities:
+ * <ol>
+ *   <li>{@link #registerAdvanced(IAdvancedRegistration)} — registers our
+ *       {@link JackPullRecipeButtonFactory}, which makes JEI render a chest-icon
+ *       button on every recipe screen. JEI handles positioning, hover styling,
+ *       tooltips, and click dispatch.</li>
+ *   <li>{@link #onRuntimeAvailable(IJeiRuntime)} — captures the runtime so the
+ *       client-side P keybind can ask JEI about sidebar/bookmark hover items.</li>
+ * </ol>
  */
 @JeiPlugin
 public final class JackItToMeJeiPlugin implements IModPlugin {
@@ -23,17 +31,11 @@ public final class JackItToMeJeiPlugin implements IModPlugin {
     }
 
     @Override
-    public void onRuntimeAvailable(IJeiRuntime jeiRuntime) {
-        runtime = jeiRuntime;
-    }
+    public void registerAdvanced(IAdvancedRegistration registration) {
+        registration.addRecipeButtonFactory(
+                new JackPullRecipeButtonFactory(registration.getJeiHelpers()));
 
-    @Override
-    public void onRuntimeUnavailable() {
-        runtime = null;
-    }
-
-    /** Null if JEI hasn't finished loading yet (early in client init, or if JEI is missing). */
-    public static IJeiRuntime runtime() {
-        return runtime;
-    }
-}
+        // Shortage-overlay decorator. Registered per vanilla recipe type — JEI's
+        // API doesn't have a "decorate everything" shortcut, so we enumerate.
+        // Modded recipe types won't get the overlay until someone wires them up,
+        // but the button itself still works on 

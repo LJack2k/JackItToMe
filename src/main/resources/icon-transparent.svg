@@ -1,0 +1,20 @@
+<svg viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg" shape-rendering="geometricPrecision">
+  <!-- Big bold downward arrow (drawn first so the cube overlaps it) -->
+  <path d="M 176 230 L 176 320 L 100 320 L 256 488 L 412 320 L 336 320 L 336 230 Z"
+        fill="#FFFFFF" stroke="#1B1B1B" stroke-width="7" stroke-linejoin="round"/>
+
+  <!-- Item cube - sitting on top of (overlapping) the arrow -->
+  <g transform="translate(256, 200)">
+    <!-- top face -->
+    <polygon points="0,-130 130,-58 0,14 -130,-58" fill="#FFC857"/>
+    <!-- left face -->
+    <polygon points="-130,-58 0,14 0,158 -130,86" fill="#D89A2A"/>
+    <!-- right face -->
+    <polygon points="130,-58 0,14 0,158 130,86" fill="#A77520"/>
+    <!-- outline -->
+    <polygon points="0,-130 130,-58 130,86 0,158 -130,86 -130,-58" fill="none" stroke="#1B1B1B" stroke-width="7" stroke-linejoin="round"/>
+    <line x1="0" y1="14" x2="0" y2="158" stroke="#1B1B1B" stroke-width="7"/>
+    <line x1="0" y1="14" x2="130" y2="-58" stroke="#1B1B1B" stroke-width="7"/>
+    <line x1="0" y1="14" x2="-130" y2="-58" stroke="#1B1B1B" stroke-width="7"/>
+  </g>
+</svg>

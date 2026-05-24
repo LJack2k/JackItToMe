@@ -2,6 +2,9 @@
     "jackittome.feedback.pulled": "Jacked %s items into your inventory",
     "jackittome.feedback.nothing_available": "Nothing matching available here",
 
+    "jackittome.button.recipe_pull.title": "Jack all ingredients",
+    "jackittome.button.recipe_pull.subtitle": "Pulls %s ingredient(s) for this recipe",
+
     "key.categories.jackittome": "JackItToMe",
     "key.jackittome.jack_hovered": "Jack hovered item"
 }
