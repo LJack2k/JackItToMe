@@ -56,7 +56,9 @@ jobs:
             build/libs/!(*-sources).jar
 
           # -------------- Metadata ----------------
-          name: JackItToMe ${{ steps.ver.outputs.value }}
+          # Display name on CurseForge / GitHub Releases. Match the jar filename
+          # so what users see in the file listing matches what they download.
+          name: JackItToMe-neoforge-1.21.1-${{ steps.ver.outputs.value }}.jar
           version: ${{ steps.ver.outputs.value }}
           version-type: release
 
