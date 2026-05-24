@@ -25,4 +25,16 @@ public final class ModPackets {
                 JackFeedbackPayload::handle
         );
 
-       
+        registrar.playToServer(
+                CheckAvailabilityPayload.TYPE,
+                CheckAvailabilityPayload.STREAM_CODEC,
+                CheckAvailabilityPayload::handle
+        );
+
+        registrar.playToClient(
+                AvailabilityResponsePayload.TYPE,
+                AvailabilityResponsePayload.STREAM_CODEC,
+                AvailabilityResponsePayload::handle
+        );
+    }
+}

@@ -114,4 +114,77 @@ public class JackPullButtonController implements IIconButtonController {
         }
 
         JackItToMe.LOGGER.info("[JackItToMe] Recipe button: pulling {} ingredient slot(s){}.",
-       
+                ingredients.size(), shift ? " (shift — shortage overridden)" : "");
+        PacketDistributor.sendToServer(new PullIngredientsPayload(ingredients, PullMode.SINGLE));
+        return true;
+    }
+
+    @Override
+    public void getTooltips(ITooltipBuilder tooltip) {
+        // Count only non-empty ingredient slots — recipes with empty cells
+        // (e.g. crafting table 3x3 with hollow centers) shouldn't inflate the count.
+        long count = collectInputIngredients().stream().filter(i -> !i.isEmpty()).count();
+        tooltip.add(Component.translatable("jackittome.button.recipe_pull.title"));
+        tooltip.add(Component.translatable("jackittome.button.recipe_pull.subtitle", count));
+    }
+
+    /** Whether the button was hovered last frame (for edge detection). */
+    private boolean wasHovered = false;
+    /** Last time we re-queried availability while hovering (millis). */
+    private long lastQueryTime = 0;
+    /** Refresh availability every this-many ms while the mouse stays on the button. */
+    private static final long REFRESH_MS = 750;
+
+    @Override
+    public void drawExtras(GuiGraphics guiGraphics, Rect2i buttonArea, int mouseX, int mouseY, float partialTicks) {
+        boolean isHovered =
+                mouseX >= buttonArea.getX() && mouseX < buttonArea.getX() + buttonArea.getWidth() &&
+                mouseY >= buttonArea.getY() && mouseY < buttonArea.getY() + buttonArea.getHeight();
+
+        if (isHovered && !wasHovered) {
+            fireAvailabilityCheck();
+            lastQueryTime = System.currentTimeMillis();
+        } else if (isHovered) {
+            long now = System.currentTimeMillis();
+            if (now - lastQueryTime > REFRESH_MS) {
+                fireAvailabilityCheck();
+                lastQueryTime = now;
+            }
+        } else if (wasHovered) {
+            AvailabilityCache.endHover(layoutDrawable.getRecipe());
+        }
+        wasHovered = isHovered;
+    }
+
+    private void fireAvailabilityCheck() {
+        List<Ingredient> ingredients = collectInputIngredients();
+        if (ingredients.isEmpty()) return;
+        long nonce = AvailabilityCache.beginHover(layoutDrawable.getRecipe());
+        PacketDistributor.sendToServer(new CheckAvailabilityPayload(nonce, ingredients));
+    }
+
+    /**
+     * Walk the recipe's input slots and build one Ingredient per slot, each
+     * containing all the slot's acceptable items (the cycling-variant case).
+     * <p>
+     * Crucially, this preserves <em>empty</em> slots as {@link Ingredient#EMPTY}
+     * rather than skipping them. Recipes like a vanilla chest are 3×3 with the
+     * center cell empty — keeping the position in the list means the decorator's
+     * iteration over slot views aligns 1:1 with the server's shortage list.
+     * The server treats {@code Ingredient#EMPTY} as "not a shortage", so empty
+     * slots never get a red overlay.
+     */
+    private List<Ingredient> collectInputIngredients() {
+        List<Ingredient> out = new ArrayList<>();
+        IRecipeSlotsView slots = layoutDrawable.getRecipeSlotsView();
+        for (IRecipeSlotView slot : slots.getSlotViews(RecipeIngredientRole.INPUT)) {
+            List<ItemStack> stacks = slot.getItemStacks().toList();
+            if (stacks.isEmpty()) {
+                out.add(Ingredient.EMPTY);
+            } else {
+                out.add(Ingredient.of(stacks.toArray(ItemStack[]::new)));
+            }
+        }
+        return out;
+    }
+}

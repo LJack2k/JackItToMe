@@ -261,4 +261,28 @@ output for "no ItemSource matched" or feedback messages.
 
 ## 7. Things to deliberately not do
 
-- Do *
+- Do **not** add a "place ingredients in crafting grid" mode. JEI's "+"
+  button already does that.
+- Do **not** broaden the network protocol to allow the client to specify
+  arbitrary ItemStacks without going through an Ingredient. The current
+  design wraps the hovered stack as `Ingredient.of(stack)` for exact-match;
+  arbitrary ItemStacks would let a hostile client extract from any open
+  container regardless of what they're viewing.
+- Do **not** resurrect the deleted PullButton / ReflectiveJeiBridge code.
+  If you want a per-recipe button, design it fresh — the deleted version
+  had architectural problems (single button for paginated recipes).
+- Do **not** assume the player is also the listener of `containerMenu`. On
+  some modded GUIs the menu is shared. Always call `broadcastChanges()` on
+  both `inventoryMenu` and the open `containerMenu` after a mutation.
+
+---
+
+## 8. Reporting back
+
+When you finish a change, mention:
+
+1. Which file(s) you touched.
+2. Whether you re-ran the smoke test (§6) or only compiled.
+3. Whether you touched any of the fragile bits in §5 — if yes, what version
+   of JEI/AE2/RS you verified against.
+4. Anything you noticed that contradicts this brief. Then update this brief.
