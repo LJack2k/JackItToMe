@@ -38,4 +38,40 @@ public final class JackItToMeJeiPlugin implements IModPlugin {
         // Shortage-overlay decorator. Registered per vanilla recipe type — JEI's
         // API doesn't have a "decorate everything" shortcut, so we enumerate.
         // Modded recipe types won't get the overlay until someone wires them up,
-        // but the button itself still works on 
+        // but the button itself still works on every recipe.
+        JackShortageDecorator decorator = new JackShortageDecorator();
+        for (RecipeType<?> type : new RecipeType<?>[]{
+                RecipeTypes.CRAFTING,
+                RecipeTypes.STONECUTTING,
+                RecipeTypes.SMELTING,
+                RecipeTypes.SMOKING,
+                RecipeTypes.BLASTING,
+                RecipeTypes.CAMPFIRE_COOKING,
+                RecipeTypes.ANVIL,
+                RecipeTypes.SMITHING,
+                RecipeTypes.BREWING,
+                RecipeTypes.GRINDSTONE,
+                RecipeTypes.COMPOSTING,
+                RecipeTypes.FUELING
+        }) {
+            @SuppressWarnings({"rawtypes", "unchecked"})
+            RecipeType raw = type;
+            registration.addRecipeCategoryDecorator(raw, decorator);
+        }
+    }
+
+    @Override
+    public void onRuntimeAvailable(IJeiRuntime jeiRuntime) {
+        runtime = jeiRuntime;
+    }
+
+    @Override
+    public void onRuntimeUnavailable() {
+        runtime = null;
+    }
+
+    /** Null if JEI hasn't finished loading yet (early in client init, or if JEI is missing). */
+    public static IJeiRuntime runtime() {
+        return runtime;
+    }
+}
