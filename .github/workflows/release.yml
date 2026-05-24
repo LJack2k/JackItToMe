@@ -1,0 +1,78 @@
+name: Release
+
+# Fires when you push a git tag starting with "v" — e.g. v0.4.0.
+# Workflow: bump mod_version in gradle.properties, commit, then:
+#   git tag v0.4.0
+#   git push --tags
+# Within ~2 minutes the jar is built and published to CurseForge.
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write    # for attaching the jar to a GitHub Release
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Build the mod
+        run: ./gradlew build --no-daemon
+
+      - name: Compute version from tag
+        id: ver
+        run: echo "value=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+        # GITHUB_REF_NAME is e.g. "v0.4.0"; we strip the "v" → "0.4.0"
+
+      - name: Publish to CurseForge (and create GitHub Release)
+        uses: Kir-Antipov/mc-publish@v3.3
+        with:
+          # -------------- CurseForge --------------
+          curseforge-id: 1552621
+          curseforge-token: ${{ secrets.CURSEFORGE_TOKEN }}
+
+          # -------------- GitHub Release ----------
+          # Set to a token that has write access if you want auto-release.
+          # GITHUB_TOKEN is provided automatically — no setup needed.
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+          # -------------- The file to upload ------
+          files: |
+            build/libs/!(*-sources).jar
+
+          # -------------- Metadata ----------------
+          name: JackItToMe ${{ steps.ver.outputs.value }}
+          version: ${{ steps.ver.outputs.value }}
+          version-type: release
+
+          loaders: neoforge
+          game-versions: 1.21.1
+          java: 21
+
+          # Each line is "slug | type" where type is required/optional/embedded/incompatible.
+          # Slugs come from each mod's CurseForge URL (the bit after /mc-mods/).
+          dependencies: |
+            jei(required){curseforge:238222}
+            applied-energistics-2(optional){curseforge:223794}
+            refined-storage(optional){curseforge:243076}
+
+          # Pulls the body of the most recent annotated tag as the changelog.
+          # If you want hand-written changelogs, point this at a CHANGELOG.md
+          # section instead.
+          changelog: |
+            See the [release notes on GitHub](https://github.com/LJack2k/JackItToMe/releases/tag/${{ github.ref_name }}).
+
+            Full changelog: https://github.com/LJack2k/JackItToMe/commits/${{ github.ref_name }}
