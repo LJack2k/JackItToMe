@@ -77,13 +77,15 @@ already confirmed.
 ## 3. File map
 
 ```
-Source/
+JackItToMe/                   (repo root = project root, no Source/ wrapper)
+├── README.md
+├── LICENSE
+├── AGENTS.md                 (this file)
 ├── build.gradle              ModDevGradle config; pin versions in gradle.properties
 ├── gradle.properties         All version pins live here
 ├── gradle/wrapper/           Gradle wrapper (pinned to 8.10.2 — do not bump to 9.x)
 ├── settings.gradle
 ├── libs/                     Local jars fallback for mods not on a public maven
-├── AGENTS.md                 (this file)
 └── src/main/
     ├── java/nl/ljack2k/jackittome/
     │   ├── JackItToMe.java                  Mod entry; wires packets, sources, client hooks
@@ -162,6 +164,26 @@ empty. The vanilla container-slot path
 (`AbstractContainerScreen#getSlotUnderMouse`) is independent of JEI and
 always works as a fallback for non-recipe-view hovers.
 
+#### 5.1.1 JEI's `IJeiUserInput.getModifiers()` returns 0
+
+When JEI dispatches a button click through `IIconButtonController.onPress`,
+the `IJeiUserInput.getModifiers()` field is **always 0** regardless of
+whether Shift/Ctrl/Alt were actually held. This is undocumented behavior
+that bit us when implementing the "Shift to override shortage" gate in
+`JackPullButtonController`. The fix is to query Minecraft's
+`Screen.hasShiftDown()` (and `hasControlDown()` / `hasAltDown()`) which
+reads GLFW's keyboard state directly. We keep an `OR` against
+`getModifiers()` for future-proofing in case JEI starts populating it.
+
+#### 5.1.2 `IRecipeSlotsView` identity is unstable
+
+Each call to `getRecipeSlotsView()` (or the decorator's slotsView parameter)
+returns a **freshly-allocated wrapper** on every render frame, so identity
+comparison (`==`) never matches between calls. If you need to pair state
+keyed on a recipe (e.g. our shortage cache), key on the *recipe object*
+itself (`layoutDrawable.getRecipe()`) — those instances ARE stable across
+renders because JEI holds them from Minecraft's recipe manager.
+
 ### 5.2 AE2 storage accessor (`compat/ae2/Ae2ItemSource.java#storageOf`)
 
 The line `menu.getHost().getInventory()` is the AE2-specific guess. Verify
@@ -208,8 +230,8 @@ each time. Vendor links:
 ## 6. Build & test
 
 ```bash
-# From the project root (D:\Projects\JackItToMe\Source)
-./gradlew build          # produces build/libs/jackittome-0.1.0.jar
+# From the project root (D:\Projects\JackItToMe)
+./gradlew build          # produces build/libs/JackItToMe-neoforge-1.21.1-0.2.0.jar
 ./gradlew runClient      # launches a dev MC client with the mod loaded
 ./gradlew runServer      # dedicated server
 ```
@@ -239,28 +261,4 @@ output for "no ItemSource matched" or feedback messages.
 
 ## 7. Things to deliberately not do
 
-- Do **not** add a "place ingredients in crafting grid" mode. JEI's "+"
-  button already does that.
-- Do **not** broaden the network protocol to allow the client to specify
-  arbitrary ItemStacks without going through an Ingredient. The current
-  design wraps the hovered stack as `Ingredient.of(stack)` for exact-match;
-  arbitrary ItemStacks would let a hostile client extract from any open
-  container regardless of what they're viewing.
-- Do **not** resurrect the deleted PullButton / ReflectiveJeiBridge code.
-  If you want a per-recipe button, design it fresh — the deleted version
-  had architectural problems (single button for paginated recipes).
-- Do **not** assume the player is also the listener of `containerMenu`. On
-  some modded GUIs the menu is shared. Always call `broadcastChanges()` on
-  both `inventoryMenu` and the open `containerMenu` after a mutation.
-
----
-
-## 8. Reporting back
-
-When you finish a change, mention:
-
-1. Which file(s) you touched.
-2. Whether you re-ran the smoke test (§6) or only compiled.
-3. Whether you touched any of the fragile bits in §5 — if yes, what version
-   of JEI/AE2/RS you verified against.
-4. Anything you noticed that contradicts this brief. Then update this brief.
+- Do *

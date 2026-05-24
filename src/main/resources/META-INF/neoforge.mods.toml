@@ -9,6 +9,12 @@ version = "${mod_version}"
 displayName = "${mod_name}"
 authors = "${mod_authors}"
 description = '''${mod_description}'''
+# Icon shown in the in-game Mods list and on CurseForge / Modrinth.
+# Path is relative to the jar's resources root, so this points at
+# src/main/resources/icon.png.
+logoFile = "icon.png"
+# logoBlur = true is fine for a smooth/rendered icon. Set false for pixel-art.
+logoBlur = true
 
 # --- Required ---
 [[dependencies.${mod_id}]]

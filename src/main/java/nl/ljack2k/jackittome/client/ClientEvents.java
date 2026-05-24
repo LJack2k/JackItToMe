@@ -66,7 +66,7 @@ public final class ClientEvents {
         event.setCanceled(true);
     }
 
-    /** Renders the falling-item animation on top of the screen each frame. */
+    /** Per-frame: draw success/failure animations on top of the current screen. */
     @SubscribeEvent
     public static void onScreenRender(ScreenEvent.Render.Post event) {
         JackAnimations.render(event.getGuiGraphics(), event.getScreen());
