@@ -15,7 +15,9 @@ java {
 }
 
 base {
-    archivesName = mod_id
+    // Produces jars named like JackItToMe-neoforge-1.21.1-1.0.0.jar — matches
+    // the convention used by most published NeoForge mods on CurseForge / Modrinth.
+    archivesName = "${mod_name}-neoforge-${minecraft_version}"
 }
 
 repositories {
