@@ -1,15 +1,17 @@
 name: Publish to Modrinth
 
 # Same trigger model as publish-curseforge.yml — see comments there for
-# the chained-release flow. To retry just Modrinth after a failure:
-# Actions → Publish to Modrinth → Run workflow → enter the tag (e.g. v0.4.0).
+# why workflow_run is used instead of release:published. To retry just
+# Modrinth after a failure: Actions → Publish to Modrinth → Run workflow
+# → enter the tag (e.g. v0.4.1).
 on:
-  release:
-    types: [published]
+  workflow_run:
+    workflows: ["Release"]
+    types: [completed]
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Release tag to publish (e.g. v0.4.0)'
+        description: 'Release tag to publish (e.g. v0.4.1)'
         required: true
         type: string
 
@@ -19,11 +21,14 @@ permissions:
 jobs:
   publish:
     runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'workflow_dispatch' ||
+            (github.event.workflow_run.conclusion == 'success' &&
+             startsWith(github.event.workflow_run.head_branch, 'v')) }}
     steps:
       - name: Resolve tag
         id: tag
         run: |
-          TAG="${{ inputs.tag || github.event.release.tag_name }}"
+          TAG="${{ inputs.tag || github.event.workflow_run.head_branch }}"
           echo "tag=$TAG"          >> "$GITHUB_OUTPUT"
           echo "version=${TAG#v}"  >> "$GITHUB_OUTPUT"
 

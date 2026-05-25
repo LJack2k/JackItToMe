@@ -1,18 +1,22 @@
 name: Publish to CurseForge
 
 # Two triggers:
-#   - Auto: fires when a GitHub Release is published (i.e. release.yml just
-#     finished creating it). This is the normal chain — push a tag, release
-#     happens, this workflow fires automatically.
-#   - Manual: workflow_dispatch with a tag input. Use this to retry a single
-#     failed publish without re-tagging or re-running the whole release.
+#   - Auto: fires when the "Release" workflow completes successfully on a
+#     tag ref. We use workflow_run (not release:published) because the
+#     Release event triggered by GITHUB_TOKEN doesn't fire downstream
+#     workflows — GitHub filters it as an anti-recursion safety. Hooking
+#     into the workflow's completion bypasses that filter cleanly.
+#   - Manual: workflow_dispatch with a tag input. Use this to retry a
+#     single failed publish without re-tagging or re-running the whole
+#     release.
 on:
-  release:
-    types: [published]
+  workflow_run:
+    workflows: ["Release"]
+    types: [completed]
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Release tag to publish (e.g. v0.4.0)'
+        description: 'Release tag to publish (e.g. v0.4.1)'
         required: true
         type: string
 
@@ -22,15 +26,22 @@ permissions:
 jobs:
   publish:
     runs-on: ubuntu-latest
+    # Gate workflow_run on success + tag-shaped head_branch. workflow_dispatch
+    # is always allowed through (manual re-runs need to work even when the
+    # last release failed). head_branch on a tag-triggered upstream is the
+    # tag name itself (e.g. "v0.4.1") — sanity-check it starts with 'v' to
+    # rule out accidental triggers from non-release contexts.
+    if: ${{ github.event_name == 'workflow_dispatch' ||
+            (github.event.workflow_run.conclusion == 'success' &&
+             startsWith(github.event.workflow_run.head_branch, 'v')) }}
     steps:
       - name: Resolve tag
         id: tag
         # Tag source depends on trigger:
-        #   - release.published → github.event.release.tag_name (e.g. "v0.4.0")
-        #   - workflow_dispatch → inputs.tag (we require the "v" prefix here too
-        #     for consistency)
+        #   - workflow_run     → github.event.workflow_run.head_branch (e.g. "v0.4.1")
+        #   - workflow_dispatch → inputs.tag
         run: |
-          TAG="${{ inputs.tag || github.event.release.tag_name }}"
+          TAG="${{ inputs.tag || github.event.workflow_run.head_branch }}"
           echo "tag=$TAG"          >> "$GITHUB_OUTPUT"
           echo "version=${TAG#v}"  >> "$GITHUB_OUTPUT"
 
