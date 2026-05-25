@@ -15,19 +15,36 @@ inventory/storage into the player's own inventory. Two complementary UIs:
 **Keybind** (default <kbd>P</kbd>): hover any item anywhere in the open
 screen, press the key, one of that item moves into the player's inventory.
 Modifier keys change quantity — Shift = a full stack, Ctrl = as much as
-will fit. The keybind path works against vanilla container slots, JEI's
-ingredient list / bookmarks / recipe-history, and slots inside a JEI recipe
-view (including cycling "any planks" tag slots — the resolver picks the
-variant actually in storage).
+will fit. If the hovered item isn't in stock but the open AE2/RS network
+can autocraft it, the keybind escalates to the native autocraft popup,
+pre-filled with the modifier amount. The keybind path works against
+vanilla container slots, JEI's ingredient list / bookmarks / recipe-
+history, and slots inside a JEI recipe view (including cycling "any
+planks" tag slots — the resolver picks the variant actually in storage).
 
 **Per-recipe button**: a chest-icon button appears next to JEI's own
 bookmark/+ buttons on every recipe view (vanilla, Create, Mekanism, AE2
-inscriber, anything that registers a JEI category). Click pulls every input
-ingredient at once. Hovering the button first triggers a server-side
-availability check; ingredients the player can't fully fulfill get a
-translucent red overlay on their slot, in declared order (top row first,
-left-to-right). Normal click is blocked when any slot is short — Shift-click
-overrides and pulls whatever's available.
+inscriber, anything that registers a JEI category). Hovering the button
+triggers a server-side availability check; ingredients the player can't
+fully fulfill get a translucent red overlay (uncraftable) or green overlay
+(craftable in AE2/RS) on their slot, in declared order (top row first,
+left-to-right).
+
+Clicking the button has two flags driven by Shift:
+- **Plain click**:
+  - If everything is in stock (no shortage of any kind): pulls every
+    ingredient. The trivial case.
+  - If any ingredient is missing: triggers the AE2/RS autocraft chain
+    for the missing-but-craftable ones and does **not** pull anything —
+    even ingredients that are in stock stay in storage.
+- **Shift+click** always pulls every in-stock ingredient *and* triggers
+  the autocraft chain for any missing-but-craftable ones.
+
+Autocraft fires on both click types when any ingredient is
+missing-but-craftable. Shift is the "always pull" modifier; without it,
+plain click pulls only when there's no shortage. There is no "block on
+shortage" failure animation — plain click against an uncraftable-only
+shortage is simply a no-op.
 
 Items come from whatever container is open behind the cursor: vanilla
 containers (chests, shulkers, barrels, the player's own inventory), AE2 ME
@@ -80,10 +97,10 @@ controller's `drawExtras` does two things every frame:
 The controller's `onPress`:
 - Skips the click if `isSimulate()`.
 - Reads `Screen.hasShiftDown()` (NOT `input.getModifiers()` — see §5.1.1).
-- If shortage cached and Shift not held: block the click.
-- Otherwise ship a `PullIngredientsPayload(List<Ingredient>, PullMode.SINGLE)`
-  with one craft's worth — empty slots preserved as `Ingredient.EMPTY` for
-  index alignment with the shortage list.
+- Always ships `PullIngredientsPayload(ingredients, PullMode.SINGLE,
+  pullAvailable=shift, triggerAutocraft=true)`. Plain click sends
+  `(false, true)`, Shift+click sends `(true, true)`. Empty recipe slots are
+  preserved as `Ingredient.EMPTY` for index alignment with the shortage list.
 
 ### Server-side fulfillment (shared by both paths)
 
@@ -156,6 +173,89 @@ are gitignored — the `rasterizeIcons` Gradle task regenerates them from the
 SVGs on every build.
 
 ---
+
+## 3a. Autocraft escalation (added after the original brief)
+
+When the underlying source is AE2 or RS, ingredients that are missing-but-
+autocraftable get extra handling. Three surfaces:
+
+**Green vs red overlay** on the recipe-button hover preview. The server's
+`AvailabilityHandler.simulate` now returns a `Result(shortages, craftable)`.
+Both lists are sent in `AvailabilityResponsePayload`. `JackPullButtonController.
+drawShortageOverlays` paints red (`0x80FF4040`) for non-craftable shortages
+and green (`0x8040FF40`) for craftable ones.
+
+**P keybind on a missing-but-craftable item**: `PullHandler` notices the
+single-ingredient pull moved nothing AND the source reports it craftable. It
+calls `source.openAutoCraftPopup(stack, amount, player)` instead of shipping
+a failure feedback packet — so no red shake animation, the native popup
+appears (pre-filled with the shortfall amount).
+
+**Recipe-button autocraft chain**: every J-button click sends
+`PullIngredientsPayload(pullAvailable=shift, triggerAutocraft=true)`.
+Server-side `PullHandler` walks the ingredients: if `pullAvailable` it
+pulls them, and (independently) if `triggerAutocraft` it collects
+unfulfilled-but-craftable ingredients into `chainCandidates`. After
+aggregating by item (see §3a.2 below), it ships
+`AutocraftChainPayload(List<ItemStack>)` to the client. Client-side
+`AutocraftChainController` holds the queue, fires `RequestAutocraftPayload`
+for item #0, advances on the *Opening* of a non-popup screen (§3a.1), then
+fires #1, etc. Plain click = autocraft only. Shift+click = autocraft +
+pull what's in stock.
+
+**AE2 vs RS popup mechanics differ:**
+
+- **AE2** popup is a real `AbstractContainerMenu` (`CraftAmountMenu`). Server
+  opens it via `MenuOpener.open(CraftAmountMenu.TYPE, player, locator)` —
+  where `locator` comes from `((AEBaseMenu) terminal).getLocator()` so we
+  reuse the locator that opened the terminal — and then calls
+  `setWhatToCraft(AEKey, int)` on the new menu. All direct API calls.
+  `ITerminalHost extends ISubMenuHost`, so closing the popup auto-returns
+  the player to the terminal — that's what makes the chain work for AE2.
+- **RS** popup is opened via the STABLE public API
+  `RefinedStorageClientApi.INSTANCE.openAutocraftingPreview(
+  List<ResourceAmount>, @Nullable Screen)`. RS opens it client-side, so
+  `RsItemSource.openAutoCraftPopup` sends `OpenRsAutocraftPayload` back to
+  the client; `RsAutocraftClient` calls the API. Closing returns to the
+  parent screen we passed in.
+
+**Craftability lookups (cheap, called per slot during hover):**
+
+- **AE2**: `IGrid.getService(ICraftingService.class).isCraftable(AEKey)`
+  — O(1) lookup. Path: `menu.getActionHost().getActionableNode().getGrid()`.
+- **RS**: `Grid.getAutocraftableResources(): Set<PlatformResourceKey>`
+  followed by `.contains(itemResource)` — O(1) hash lookup. STABLE since
+  RS 2.0.0-milestone.3.0.
+
+### 3a.1 Chain advance detection — the subtle bit
+
+AE2's autocraft flow is multi-screen: `CraftAmountScreen → CraftConfirmScreen
+→ submit → terminal`. Triggering the next chain step on close-of-popup would
+fire popup #2 while the user is still in `CraftConfirmScreen` for #1,
+replacing the confirm screen and losing the in-flight selection. Instead,
+`AutocraftChainController` hooks `ScreenEvent.Opening` and advances only
+when the *new* screen is **not** one of the popup screens AND the previous
+state was "in popup flow". Popup recognition is by class-name substring on
+{`craftamount`, `craftconfirm`, `autocrafting`, `crafterror`}; collision-free
+with regular terminal/grid screen names. A `ScreenEvent.Closing` fallback
+covers the "popup closed to no screen" edge case (deferred two ticks so a
+successor popup, if any, gets a chance to open first).
+
+### 3a.2 Network protocol version
+
+`ModPackets.register` calls `.versioned("5")`. Bump on every wire-format
+break. Current history:
+- `"1"`: initial release
+- `"2"`: `AvailabilityResponsePayload` gained `craftable[]`
+- `"3"`: `OpenRsAutocraftPayload` gained `amount`; chain `ItemStack`s now
+  carry shortfall in their count
+- `"4"`: `PullIngredientsPayload` swapped `respectShortageGate` (single
+  bool) for two independent flags: `pullAvailable` + `triggerAutocraft`.
+  Plain click = autocraft only. Shift adds pulling.
+- `"5"`: `JackFeedbackPayload` changed from `(item, moved)` to
+  `(List<ItemStack> successItems, ItemStack failureItem)`. Server now
+  collects per-`Item` totals during the extract loop; client fans out
+  one staggered success animation per unique pulled ingredient type.
 
 ## 4. Where the seams are
 
@@ -297,28 +397,49 @@ JEI, AE2, RS, guideme are pulled via CurseMaven at runtime.
 
 ### Smoke tests
 
-**Keybind path:**
+**Keybind path (vanilla container):**
 1. New creative world, place a chest, put 8 oak planks in it.
 2. Open the chest.
 3. Hover an item — in the chest, in your inventory, or in JEI's sidebar.
 4. Press P. One item moves chest → inventory.
 5. Try Shift+P (one stack), Ctrl+P (as much as fits).
 
-**Recipe-button path:**
-1. With 7 oak planks in the chest (one short of a chest recipe).
+**Recipe-button path (vanilla container, no autocraft available):**
+1. Stand at the chest with 7 oak planks in it (one short of a chest recipe).
 2. Press R on a chest item to view its recipe.
-3. Hover the J button. Within ~50ms the 8th plank slot gets a red overlay.
-4. Click without modifier — blocked, log shows
-   "click blocked: shortage".
-5. Add an 8th plank to the chest, wait one refresh cycle (~750ms), red
-   should disappear.
-6. Now click — pulls all 8 planks at once.
-7. Re-empty to 7 planks, hover, Shift-click — pulls 7 planks, leaves the
-   one slot unfulfilled.
+3. Hover the J button. Within ~50ms the 8th plank slot gets a **red** overlay
+   (no AE2/RS, so no green).
+4. Click without modifier — **no-op** (no items pulled, no animation, no
+   autocraft path on a vanilla container). Tooltip hint shows "Hold Shift
+   to pull what's in stock".
+5. Shift+click — pulls 7 planks. One slot stays unfulfilled.
+6. Add the 8th plank to the chest, wait one refresh cycle (~750ms), red
+   overlay should disappear.
+7. Now plain click — pulls all 8 (no shortage, so plain click pulls).
 
-If hover triggers nothing visible: check `run/logs/latest.log` for
-`[Jack-cache]` or `[Jack-button]` entries (diagnostic logs added during
-development — left in for future debugging).
+**Recipe-button path (AE2 terminal with autocraft):**
+1. Set up an AE2 ME network with a pattern producer for oak planks
+   (e.g. 1 oak log → 4 planks via a Molecular Assembler with a Pattern Provider).
+2. Put 32 logs in the network. Network now has 0 planks but can craft them.
+3. Open the ME terminal, view the wooden chest recipe in JEI.
+4. Hover the J button — all 8 plank slots get a **green** overlay (within ~100ms).
+5. Tooltip shows `8 ingredient(s) needed` / `8 can be autocrafted` /
+   no shift hint (nothing in stock to pull).
+6. Plain click — AE2's CraftAmountMenu opens, pre-filled with **8**.
+   No items move into the player's inventory yet.
+7. Cancel out, fill the network with 6 planks, hover J — 6 slots clear,
+   2 stay green. Tooltip: `8 ingredient(s) needed` / `2 can be autocrafted` /
+   `Hold Shift to also pull what's in stock`.
+8. Plain click — popup opens pre-filled with **2** (the shortfall, not 8).
+9. Cancel, then Shift+click — 6 planks pull into inventory with fanned-out
+   animation, popup opens for 2 more.
+
+**Cache-clear test:**
+1. Hover J button on a recipe with a shortage (any overlays visible).
+2. Press Esc while still hovering to close the recipe view.
+3. Open a different inventory / different container.
+4. Open the same recipe again, do NOT hover J.
+5. Expect: no overlays visible. They should only appear when you re-hover.
 
 ---
 

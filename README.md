@@ -6,11 +6,27 @@ worth via a button on JEI's recipe screen.
 
 ## Two ways to grab items
 
-### 1. Hover-and-press: pull one item
+### 1. Hover-and-press: pull items
 
 Hover the cursor over **any item** in any open screen and press **P**. One of
 that item moves into your inventory, sourced from whatever container is open
 behind the cursor.
+
+Modifier keys change how much you pull:
+
+| Modifier        | Effect                                  |
+| --------------- | --------------------------------------- |
+| (none)          | One item                                |
+| **Shift+P**     | One full stack (up to 64)               |
+| **Ctrl+P**      | As much as fits in your inventory       |
+
+Ctrl beats Shift if you hold both.
+
+**Autocraft escalation:** if the hovered item isn't in stock but your open
+AE2/RS network has a pattern for it, pressing P opens the native autocraft
+popup pre-filled with the amount your modifier asked for (1 / 64 / a lot).
+This works seamlessly whether you're hovering JEI's sidebar, a bookmark, or
+a slot inside a recipe view.
 
 Works on:
 
@@ -22,21 +38,30 @@ Works on:
   slots, where all variants are considered and whichever you actually have
   is what gets pulled
 
-### 2. Per-recipe button: pull all ingredients at once
+### 2. Per-recipe button: start crafting (and optionally pull what's ready)
 
 While viewing any recipe in JEI, a chest-icon **J** button appears next to
-JEI's own bookmark/+ buttons. Hover it to preview which slots can be
-fulfilled; click to pull every ingredient in one go.
+JEI's own bookmark/+ buttons. Hover it to preview the state of each slot,
+then click to act on the recipe.
 
-- **Hover** the button: each input slot the recipe needs is checked against
-  your open storage in order (top-row first, left-to-right). Slots that
-  can't be filled get a translucent red overlay. Refreshes every 750ms while
-  you stay on the button, so the preview tracks live storage changes.
-- **Click** the button: if every slot is fulfilled, all ingredients move
-  into your inventory in one packet.
-- **Click with a shortage**: blocked by default — you'd be wasting a click
-  for a recipe you can't actually craft. **Hold Shift while clicking** to
-  override and pull whatever's available.
+- **Hover** the button: each input slot is checked against your open
+  storage. Refreshes every 750ms while you stay on the button.
+  - **Red overlay** = missing, and no AE2/RS pattern can produce it.
+  - **Green overlay** = missing, but your network can autocraft it.
+  - **No overlay** = in stock.
+- **Click** the button:
+  - If every ingredient is in stock (no shortage): pulls them all into
+    your inventory. The straightforward case.
+  - If any ingredient is missing: triggers autocraft popups (one after
+    the next) for the missing-but-craftable ones. **Does not pull
+    anything** — even items that are in stock stay in storage until
+    you Shift+click separately.
+- **Shift+Click** the button: always pulls every in-stock ingredient,
+  **and** triggers autocraft popups for any missing-but-craftable ones.
+
+The rule in one sentence: Shift is the "always pull" modifier. Plain click
+pulls only when there's nothing to autocraft; otherwise it leaves your
+inventory alone so you can review the autocraft popups without committing.
 
 Where items come from for both modes:
 
@@ -84,17 +109,24 @@ Subsequent launches are cached and start in ~30 seconds.
 
 ## How it works (in a paragraph)
 
-The keybind and the button both send a `PullIngredientsPayload` to the
-server. The server resolves the player's open menu against an ordered
-`ItemSource` registry (AE2 and RS register at higher priority than the
-vanilla container fallback). For each ingredient the most-abundant
-acceptable variant is selected, items are extracted, and they land in the
-player's inventory. A `JackFeedbackPayload` comes back with the actual
-extracted item; the client renders either a falling-into-hotbar success
-animation or a red-shake failure shake. For the button's hover preview the
-client also sends a `CheckAvailabilityPayload` which the server answers with
-a per-slot shortage boolean list; an `IRecipeCategoryDecorator` paints the
-red overlays from that.
+The keybind and the button both send a `PullIngredientsPayload` (with
+`pullAvailable` + `triggerAutocraft` flags) to the server. The server
+resolves the player's open menu against an ordered `ItemSource` registry
+(AE2 and RS register at higher priority than the vanilla container
+fallback). It simulates the pull first to compute per-ingredient shortfalls
+against the source's actual stock; then, if `pullAvailable`, extracts the
+in-stock portion via the source's official API (so AE2 security stations,
+RS access modes, vanilla `mayPickup`, and modded slot restrictions are all
+respected). For each ingredient still short and reported as craftable by
+the source, the server queues a popup via `AutocraftChainPayload`; the
+client opens them one at a time, advancing on the close of each popup
+flow. A `JackFeedbackPayload` carries the list of items actually moved
+(one staggered fan-out animation per unique pulled type), plus an optional
+failure item for the red-shake. For the button's hover preview the client
+sends a `CheckAvailabilityPayload` which the server answers with a
+per-slot `(shortage, craftable)` pair; `JackPullButtonController.drawExtras`
+paints red or green overlays from that via JEI's universal recipe-button
+factory hook (no per-recipe-type decorator registration needed).
 
 ## License
 

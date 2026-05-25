@@ -13,6 +13,9 @@ import com.refinedmods.refinedstorage.common.api.storage.PlayerActor;
 import com.refinedmods.refinedstorage.common.grid.AbstractGridContainerMenu;
 import com.refinedmods.refinedstorage.common.support.resource.ItemResource;
 
+import nl.ljack2k.jackittome.network.OpenRsAutocraftPayload;
+import net.neoforged.neoforge.network.PacketDistributor;
+
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.ItemStack;
 
@@ -98,6 +101,62 @@ public final class RsItemSource implements ItemSource {
             ItemStack leftover = stack.copyWithCount((int) (stack.getCount() - inserted));
             player.drop(leftover, false);
         }
+    }
+
+    /**
+     * Does RS's grid currently know how to autocraft {@code template}? Uses
+     * {@code Grid#getAutocraftableResources} — a STABLE, cheap set lookup
+     * exposed since RS 2.0.0-milestone.3.0. The returned set contains every
+     * autocraftable {@code PlatformResourceKey}; our {@link ItemResource}
+     * implements that interface, so a plain {@code Set#contains} works.
+     */
+    @Override
+    public boolean isAutocraftable(ItemStack template, ServerPlayer player) {
+        if (template.isEmpty()) return false;
+        try {
+            Grid grid = gridOf(player);
+            if (grid == null || !grid.isGridActive()) return false;
+            ResourceKey resource = resourceOf(template);
+            return grid.getAutocraftableResources().contains(resource);
+        } catch (Throwable t) {
+            JackItToMe.LOGGER.debug("[RS] isAutocraftable failed: {}", t.toString());
+            return false;
+        }
+    }
+
+    /**
+     * Open RS's autocrafting preview popup for {@code template}.
+     * <p>
+     * Unlike AE2 (which uses a server-driven {@code MenuOpener} call) RS's
+     * preview screen is a regular {@code Screen}, opened on the client after
+     * the client sends a {@code AutocraftingPreviewRequestPacket} and the
+     * response packet arrives. The whole flow is normally driven from the
+     * client (RS's {@code AutocraftingRequest} helper).
+     * <p>
+     * Our server-side hook therefore can't directly open the screen — it sends
+     * a tiny {@link OpenRsAutocraftPayload} to the client, which then invokes
+     * RS's own {@code AutocraftingRequest} machinery. That keeps the whole RS
+     * UI flow inside RS, which means cancellation, preview tree, etc. all
+     * Just Work.
+     */
+    @Override
+    public boolean openAutoCraftPopup(ItemStack template, int amount, ServerPlayer player) {
+        if (template.isEmpty()) return false;
+        if (!(player.containerMenu instanceof AbstractGridContainerMenu)) return false;
+        try {
+            int initial = Math.max(1, amount);
+            PacketDistributor.sendToPlayer(player, new OpenRsAutocraftPayload(template, initial));
+            return true;
+        } catch (Throwable t) {
+            JackItToMe.LOGGER.debug("[RS] openAutoCraftPopup failed: {}", t.toString());
+            return false;
+        }
+    }
+
+    /** Convenience wrapper that hands us the Grid for the player's open menu. */
+    private static Grid gridOf(ServerPlayer player) {
+        if (!(player.containerMenu instanceof AbstractGridContainerMenu menu)) return null;
+        return gridOf(menu);
     }
 
     /** Build the RS ResourceKey for this ItemStack — Item + data components. */

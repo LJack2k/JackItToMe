@@ -32,19 +32,28 @@ public final class AvailabilityHandler {
     private AvailabilityHandler() {}
 
     public static void handle(ServerPlayer player, CheckAvailabilityPayload req) {
-        List<Boolean> shortages = simulate(player, req.ingredients());
-        PacketDistributor.sendToPlayer(player, new AvailabilityResponsePayload(req.nonce(), shortages));
+        Result r = simulate(player, req.ingredients());
+        PacketDistributor.sendToPlayer(player,
+                new AvailabilityResponsePayload(req.nonce(), r.shortages, r.craftable));
     }
 
-    /** Per-ingredient shortage boolean, in the same order as the input list. */
-    private static List<Boolean> simulate(ServerPlayer player, List<Ingredient> ingredients) {
-        List<Boolean> out = new ArrayList<>(ingredients.size());
+    /**
+     * Shortages and craftable flags, in the same order as the input list.
+     * Public so {@link PullHandler} can use the same simulator for its
+     * server-authoritative shortage gate and its Shift-click chain selection.
+     */
+    public static Result simulate(ServerPlayer player, List<Ingredient> ingredients) {
+        List<Boolean> shortages = new ArrayList<>(ingredients.size());
+        List<Boolean> craftable = new ArrayList<>(ingredients.size());
 
         ItemSource source = ItemSourceRegistry.findSource(player);
         if (source == null) {
-            // No source at all → everything's a shortage.
-            for (int i = 0; i < ingredients.size(); i++) out.add(Boolean.TRUE);
-            return out;
+            // No source at all → everything's a shortage, nothing is craftable.
+            for (int i = 0; i < ingredients.size(); i++) {
+                shortages.add(Boolean.TRUE);
+                craftable.add(Boolean.FALSE);
+            }
+            return new Result(shortages, craftable);
         }
 
         // Sample what's available once, then track decrements locally.
@@ -54,8 +63,9 @@ public final class AvailabilityHandler {
 
         for (Ingredient ing : ingredients) {
             if (ing.isEmpty()) {
-                // Empty slot in the recipe — not a shortage.
-                out.add(Boolean.FALSE);
+                // Empty slot in the recipe — not a shortage, not craftable.
+                shortages.add(Boolean.FALSE);
+                craftable.add(Boolean.FALSE);
                 continue;
             }
 
@@ -75,12 +85,29 @@ public final class AvailabilityHandler {
             }
 
             if (bestStack.isEmpty() || bestCount <= 0) {
-                out.add(Boolean.TRUE);  // shortage
+                shortages.add(Boolean.TRUE);  // shortage
+                // Check craftability across all acceptable variants — any one
+                // that's craftable is enough to flag the slot green. We stop at
+                // the first hit because both AE2 and RS make this a cheap O(1)
+                // set/service lookup, so even N variants is fine.
+                boolean anyCraftable = false;
+                for (ItemStack acceptable : ing.getItems()) {
+                    if (acceptable.isEmpty()) continue;
+                    if (source.isAutocraftable(acceptable, player)) {
+                        anyCraftable = true;
+                        break;
+                    }
+                }
+                craftable.add(anyCraftable);
             } else {
                 remaining.put(bestStack.getItem(), bestCount - 1);
-                out.add(Boolean.FALSE); // ok
+                shortages.add(Boolean.FALSE); // ok
+                craftable.add(Boolean.FALSE);
             }
         }
-        return out;
+        return new Result(shortages, craftable);
     }
+
+    /** Bundle of parallel arrays — same length, indexed by ingredient slot. */
+    public record Result(List<Boolean> shortages, List<Boolean> craftable) {}
 }
