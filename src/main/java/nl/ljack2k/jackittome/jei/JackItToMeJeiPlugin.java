@@ -3,8 +3,6 @@ package nl.ljack2k.jackittome.jei;
 import nl.ljack2k.jackittome.JackItToMe;
 import mezz.jei.api.IModPlugin;
 import mezz.jei.api.JeiPlugin;
-import mezz.jei.api.constants.RecipeTypes;
-import mezz.jei.api.recipe.RecipeType;
 import mezz.jei.api.registration.IAdvancedRegistration;
 import mezz.jei.api.runtime.IJeiRuntime;
 import net.minecraft.resources.ResourceLocation;
@@ -32,32 +30,12 @@ public final class JackItToMeJeiPlugin implements IModPlugin {
 
     @Override
     public void registerAdvanced(IAdvancedRegistration registration) {
+        // The factory registers the button universally across every recipe type
+        // — including modded ones — so the button controller's drawExtras
+        // method also draws shortage overlays for everything. No per-type
+        // decorator registration is needed.
         registration.addRecipeButtonFactory(
                 new JackPullRecipeButtonFactory(registration.getJeiHelpers()));
-
-        // Shortage-overlay decorator. Registered per vanilla recipe type — JEI's
-        // API doesn't have a "decorate everything" shortcut, so we enumerate.
-        // Modded recipe types won't get the overlay until someone wires them up,
-        // but the button itself still works on every recipe.
-        JackShortageDecorator decorator = new JackShortageDecorator();
-        for (RecipeType<?> type : new RecipeType<?>[]{
-                RecipeTypes.CRAFTING,
-                RecipeTypes.STONECUTTING,
-                RecipeTypes.SMELTING,
-                RecipeTypes.SMOKING,
-                RecipeTypes.BLASTING,
-                RecipeTypes.CAMPFIRE_COOKING,
-                RecipeTypes.ANVIL,
-                RecipeTypes.SMITHING,
-                RecipeTypes.BREWING,
-                RecipeTypes.GRINDSTONE,
-                RecipeTypes.COMPOSTING,
-                RecipeTypes.FUELING
-        }) {
-            @SuppressWarnings({"rawtypes", "unchecked"})
-            RecipeType raw = type;
-            registration.addRecipeCategoryDecorator(raw, decorator);
-        }
     }
 
     @Override

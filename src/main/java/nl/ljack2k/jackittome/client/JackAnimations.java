@@ -37,28 +37,38 @@ public final class JackAnimations {
     private static final class Anim {
         final ItemStack stack;
         final float startX, startY;
+        /** Wallclock time at which this animation should start rendering. */
         final long startTime;
         final Kind kind;
 
-        Anim(ItemStack stack, float x, float y, Kind kind) {
+        Anim(ItemStack stack, float x, float y, Kind kind, long delayMs) {
             this.stack = stack.copyWithCount(1);
             this.startX = x;
             this.startY = y;
-            this.startTime = System.currentTimeMillis();
+            this.startTime = System.currentTimeMillis() + delayMs;
             this.kind = kind;
         }
     }
 
-    /** Falling-into-hotbar success animation. */
+    /** Falling-into-hotbar success animation. Convenience overload with no delay. */
     public static void start(ItemStack stack, double mouseX, double mouseY) {
+        start(stack, mouseX, mouseY, 0L);
+    }
+
+    /**
+     * Falling-into-hotbar success animation, with an optional delay before
+     * it starts rendering. {@link ClientFeedback} uses the delay to stagger
+     * a series of animations so they fan out visibly instead of overlapping.
+     */
+    public static void start(ItemStack stack, double mouseX, double mouseY, long delayMs) {
         if (stack == null || stack.isEmpty()) return;
-        ACTIVE.add(new Anim(stack, (float) mouseX, (float) mouseY, Kind.SUCCESS));
+        ACTIVE.add(new Anim(stack, (float) mouseX, (float) mouseY, Kind.SUCCESS, delayMs));
     }
 
     /** Shake-and-fade failure animation. */
     public static void startFailure(ItemStack stack, double mouseX, double mouseY) {
         if (stack == null || stack.isEmpty()) return;
-        ACTIVE.add(new Anim(stack, (float) mouseX, (float) mouseY, Kind.FAILURE));
+        ACTIVE.add(new Anim(stack, (float) mouseX, (float) mouseY, Kind.FAILURE, 0L));
     }
 
     public static void render(GuiGraphics g, Screen screen) {
@@ -72,6 +82,7 @@ public final class JackAnimations {
         while (it.hasNext()) {
             Anim a = it.next();
             long elapsed = now - a.startTime;
+            if (elapsed < 0) continue;                  // still in the staggered pre-start delay
             if (elapsed >= DURATION_MS) {
                 it.remove();
                 continue;

@@ -18,6 +18,7 @@ import mezz.jei.api.recipe.RecipeIngredientRole;
 import nl.ljack2k.jackittome.client.AvailabilityCache;
 import nl.ljack2k.jackittome.network.CheckAvailabilityPayload;
 
+import net.minecraft.ChatFormatting;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.renderer.Rect2i;
@@ -93,29 +94,21 @@ public class JackPullButtonController implements IIconButtonController {
             return false;
         }
 
-        // Shortage gate: if any ingredient is short and shift isn't held, block.
-        // Note: IJeiUserInput.getModifiers() returns 0 in JEI 19.27 regardless of
-        // actual modifier state — JEI doesn't propagate GLFW modifier bits to
-        // button click handlers. We use Minecraft's Screen.hasShiftDown() which
-        // queries GLFW's keyboard state directly and is reliable across all
-        // input paths. The modifier-bit check is left in as a future-proof
-        // belt-and-braces in case JEI starts populating it.
+        // Autocraft always fires on the J button — whether or not Shift is
+        // held. Shift is purely the "also pull what's in stock" toggle.
+        // We read Screen.hasShiftDown() rather than input.getModifiers()
+        // because JEI's IJeiUserInput.getModifiers() always returns 0 in
+        // 19.27 (see AGENTS.md §5.1.1).
         boolean shift =
                 (input.getModifiers() & GLFW.GLFW_MOD_SHIFT) != 0
                 || Screen.hasShiftDown();
+        boolean pullAvailable = shift;
+        boolean triggerAutocraft = true;
 
-        if (!shift) {
-            List<Boolean> shortages = nl.ljack2k.jackittome.client.AvailabilityCache
-                    .shortagesFor(layoutDrawable.getRecipe());
-            if (shortages != null && shortages.contains(Boolean.TRUE)) {
-                JackItToMe.LOGGER.debug("[JackItToMe] Recipe button click blocked: shortage. Hold Shift to override.");
-                return false;
-            }
-        }
-
-        JackItToMe.LOGGER.info("[JackItToMe] Recipe button: pulling {} ingredient slot(s){}.",
-                ingredients.size(), shift ? " (shift — shortage overridden)" : "");
-        PacketDistributor.sendToServer(new PullIngredientsPayload(ingredients, PullMode.SINGLE));
+        JackItToMe.LOGGER.info("[JackItToMe] Recipe button: {} ingredients, pull={}, autocraft={}.",
+                ingredients.size(), pullAvailable, triggerAutocraft);
+        PacketDistributor.sendToServer(new PullIngredientsPayload(
+                ingredients, PullMode.SINGLE, pullAvailable, triggerAutocraft));
         return true;
     }
 
@@ -123,9 +116,70 @@ public class JackPullButtonController implements IIconButtonController {
     public void getTooltips(ITooltipBuilder tooltip) {
         // Count only non-empty ingredient slots — recipes with empty cells
         // (e.g. crafting table 3x3 with hollow centers) shouldn't inflate the count.
-        long count = collectInputIngredients().stream().filter(i -> !i.isEmpty()).count();
+        List<Ingredient> ingredients = collectInputIngredients();
+        int total = (int) ingredients.stream().filter(i -> !i.isEmpty()).count();
+
+        // Pull the same availability data the overlays use. Null lists mean
+        // the server response hasn't arrived yet (or hover just started);
+        // in that case we show only the basic count.
+        Object recipe = layoutDrawable.getRecipe();
+        List<Boolean> shortages = AvailabilityCache.shortagesFor(recipe);
+        List<Boolean> craftable = AvailabilityCache.craftableFor(recipe);
+
+        int missingUncraftable = 0;
+        int missingCraftable = 0;
+        if (shortages != null) {
+            int n = Math.min(shortages.size(), ingredients.size());
+            for (int i = 0; i < n; i++) {
+                if (!shortages.get(i)) continue;
+                boolean canCraft = craftable != null && i < craftable.size() && craftable.get(i);
+                if (canCraft) missingCraftable++;
+                else missingUncraftable++;
+            }
+        }
+        int totalMissing = missingUncraftable + missingCraftable;
+
+        // Title.
         tooltip.add(Component.translatable("jackittome.button.recipe_pull.title"));
-        tooltip.add(Component.translatable("jackittome.button.recipe_pull.subtitle", count));
+
+        // Counts. "All N available" reads nicer than "N ingredients needed, 0 missing".
+        if (shortages != null && totalMissing == 0) {
+            tooltip.add(Component.translatable("jackittome.button.recipe_pull.ready", total)
+                    .withStyle(ChatFormatting.GRAY));
+        } else {
+            tooltip.add(Component.translatable("jackittome.button.recipe_pull.total", total)
+                    .withStyle(ChatFormatting.GRAY));
+        }
+
+        // Breakdown — only show lines for non-zero categories.
+        if (missingUncraftable > 0) {
+            tooltip.add(Component.translatable(
+                            "jackittome.button.recipe_pull.missing", missingUncraftable)
+                    .withStyle(ChatFormatting.RED));
+        }
+        if (missingCraftable > 0) {
+            tooltip.add(Component.translatable(
+                            "jackittome.button.recipe_pull.craftable", missingCraftable)
+                    .withStyle(ChatFormatting.GREEN));
+        }
+
+        // Hint. Show only when holding Shift would do strictly more than a
+        // plain click — i.e. when there's BOTH a shortage AND something in
+        // stock. When all is in stock, plain click already pulls (no Shift
+        // needed). When nothing is in stock, Shift has nothing extra to pull.
+        // Two wordings differ on whether autocraft is also happening:
+        //   - mix of craftable + in-stock: "also pull" (plain click is
+        //     already triggering autocraft; Shift adds the pull on top)
+        //   - only uncraftable shortage + in-stock: plain click is a
+        //     no-op, so "pull what's in stock" without the "also".
+        int inStock = total - totalMissing;
+        if (shortages != null && inStock > 0 && totalMissing > 0) {
+            String key = (missingCraftable > 0)
+                    ? "jackittome.button.recipe_pull.shift_hint"
+                    : "jackittome.button.recipe_pull.shift_partial";
+            tooltip.add(Component.translatable(key)
+                    .withStyle(ChatFormatting.DARK_GRAY, ChatFormatting.ITALIC));
+        }
     }
 
     /** Whether the button was hovered last frame (for edge detection). */
@@ -142,6 +196,13 @@ public class JackPullButtonController implements IIconButtonController {
                 mouseY >= buttonArea.getY() && mouseY < buttonArea.getY() + buttonArea.getHeight();
 
         if (isHovered && !wasHovered) {
+            // New hover session — wipe any leftover state from a previous
+            // session (different recipe view, different open container,
+            // anything). Without this, opening a recipe view, viewing it
+            // through JEI's internal recipe navigation, then coming back
+            // to the same recipe later would briefly flash the old
+            // overlays until the new server response arrived.
+            AvailabilityCache.clear();
             fireAvailabilityCheck();
             lastQueryTime = System.currentTimeMillis();
         } else if (isHovered) {
@@ -154,7 +215,65 @@ public class JackPullButtonController implements IIconButtonController {
             AvailabilityCache.endHover(layoutDrawable.getRecipe());
         }
         wasHovered = isHovered;
+
+        // Render shortage overlays on input slots — same technique JEI's own
+        // "+" button uses (see RecipeTransferErrorMissingSlots). Critically,
+        // this runs from drawExtras, which JEI calls for ANY recipe type
+        // because button factories are registered universally. No decorator
+        // registration per type, no hardcoded list — works for vanilla,
+        // Create, AE2's inscriber, Mekanism, anything.
+        drawShortageOverlays(guiGraphics);
     }
+
+    /**
+     * Walk the cached shortages list and call {@code slot.drawHighlight} on
+     * each shortage slot. The pose stack is translated to the recipe's screen
+     * origin first so slot drawHighlights land at the correct positions
+     * (slot views report positions relative to the recipe origin, not screen).
+     * <p>
+     * Color follows the per-slot craftable flag: red for "missing and we can't
+     * help you", green for "missing but AE2/RS can autocraft it". The green
+     * variant tells the user that a Shift-click on the J button will queue
+     * autocraft popups for these slots (and a single P-key press on the slot
+     * itself will pop the popup directly for that one item).
+     */
+    private void drawShortageOverlays(GuiGraphics gg) {
+        // Only render while this controller's button is the one being hovered
+        // — protects against the cache holding data from a previous session
+        // (different recipe view, different open container). The cache itself
+        // also gets cleared on hover-enter and on JEI recipe-screen close
+        // (see ClientEvents.onScreenClosing), but this gate is the last-line
+        // defense: a freshly-instantiated controller for a recipe that was
+        // hovered previously will not render anything until the user actually
+        // hovers this button.
+        if (!wasHovered) return;
+
+        Object recipe = layoutDrawable.getRecipe();
+        List<Boolean> shortages = AvailabilityCache.shortagesFor(recipe);
+        if (shortages == null) return;
+        List<Boolean> craftable = AvailabilityCache.craftableFor(recipe);
+
+        IRecipeSlotsView slotsView = layoutDrawable.getRecipeSlotsView();
+        List<IRecipeSlotView> inputs = slotsView.getSlotViews(RecipeIngredientRole.INPUT);
+        Rect2i recipeRect = layoutDrawable.getRect();
+
+        gg.pose().pushPose();
+        gg.pose().translate(recipeRect.getX(), recipeRect.getY(), 0);
+
+        int n = Math.min(inputs.size(), shortages.size());
+        for (int i = 0; i < n; i++) {
+            if (!shortages.get(i)) continue;
+            boolean canCraft = craftable != null && i < craftable.size() && craftable.get(i);
+            inputs.get(i).drawHighlight(gg, canCraft ? CRAFTABLE_OVERLAY_COLOR : SHORTAGE_OVERLAY_COLOR);
+        }
+
+        gg.pose().popPose();
+    }
+
+    /** Translucent red — matches the visual of JEI's own missing-slot error. */
+    private static final int SHORTAGE_OVERLAY_COLOR = 0x80FF4040;
+    /** Translucent green — "missing, but your AE2/RS network can autocraft it". */
+    private static final int CRAFTABLE_OVERLAY_COLOR = 0x8040FF40;
 
     private void fireAvailabilityCheck() {
         List<Ingredient> ingredients = collectInputIngredients();

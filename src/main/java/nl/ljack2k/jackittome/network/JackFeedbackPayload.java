@@ -10,17 +10,24 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 
+import java.util.List;
+
 /**
- * Server → client. Reports the outcome of the player's pull request.
+ * Server → client. Reports the outcome of a pull request.
  * <p>
- * {@code moved > 0} means at least one item went into the player's inventory;
- * the client plays the success (falling-into-hotbar) animation.
- * {@code moved == 0} means nothing was available; the client plays the
- * failure (shake-and-fade) animation plus a "denied" sound.
- * <p>
- * The packet is always sent after a pull request so the client only ever
- * animates after server confirmation — no more optimistic animations that
- * get contradicted by a late failure response.
+ * Two independent fields:
+ * <ul>
+ *   <li>{@code successItems} — one entry per unique {@code Item} that was
+ *       extracted from the source. Each stack's count is the actual amount
+ *       moved. The client fires one falling-into-hotbar animation per
+ *       entry, fanned out horizontally and staggered in time so they don't
+ *       overlap visually.</li>
+ *   <li>{@code failureItem} — if non-empty, the client plays the red-shake
+ *       failure animation for it. Used for the "P on a missing-and-
+ *       uncraftable item" path.</li>
+ * </ul>
+ * Either or both lists can be present, though in practice we set exactly
+ * one: a pull either succeeded (with one or more items) or failed.
  * <p>
  * Note on safety: this class references {@link ClientFeedback} from the
  * {@link #handle(IPayloadContext)} body. That's a client-only class, but
@@ -30,15 +37,17 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
  * never invokes {@code handle()}, so the server never tries to load the
  * client-only class. Safe.
  */
-public record JackFeedbackPayload(ItemStack item, int moved) implements CustomPacketPayload {
+public record JackFeedbackPayload(List<ItemStack> successItems, ItemStack failureItem) implements CustomPacketPayload {
 
     public static final Type<JackFeedbackPayload> TYPE =
             new Type<>(ResourceLocation.fromNamespaceAndPath(JackItToMe.MODID, "jack_feedback"));
 
     public static final StreamCodec<RegistryFriendlyByteBuf, JackFeedbackPayload> STREAM_CODEC =
             StreamCodec.composite(
-                    ItemStack.OPTIONAL_STREAM_CODEC, JackFeedbackPayload::item,
-                    ByteBufCodecs.VAR_INT,           JackFeedbackPayload::moved,
+                    ItemStack.OPTIONAL_STREAM_CODEC.apply(ByteBufCodecs.list()),
+                    JackFeedbackPayload::successItems,
+                    ItemStack.OPTIONAL_STREAM_CODEC,
+                    JackFeedbackPayload::failureItem,
                     JackFeedbackPayload::new
             );
 
@@ -48,6 +57,6 @@ public record JackFeedbackPayload(ItemStack item, int moved) implements CustomPa
     }
 
     public void handle(IPayloadContext ctx) {
-        ctx.enqueueWork(() -> ClientFeedback.handle(item, moved));
+        ctx.enqueueWork(() -> ClientFeedback.handle(successItems, failureItem));
     }
 }

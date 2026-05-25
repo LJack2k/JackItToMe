@@ -14,13 +14,33 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
 import java.util.List;
 
 /**
- * Client → server. "Pull these ingredients into my inventory from whatever
- * container I currently have open."
+ * Client → server. "Operate on these ingredients in the context of my
+ * currently-open container."
+ * <p>
+ * The two booleans are independent and decide what the server does:
+ * <ul>
+ *   <li>{@code pullAvailable} — extract every ingredient the source has in
+ *       stock and place it in the player's inventory.</li>
+ *   <li>{@code triggerAutocraft} — for ingredients the source can't fulfill
+ *       but reports as autocraftable, queue the chain of native AE2/RS
+ *       autocraft popups (via {@link AutocraftChainPayload}) or, for a
+ *       single-ingredient pull, escalate directly to a popup.</li>
+ * </ul>
+ * Both flags can be set together (Shift+click on the J button: pull what's
+ * there AND start autocrafting). Both can be set on a single-item P
+ * keybind too — pull if in stock, else autocraft if craftable.
  *
- * @param ingredients ingredients to pull
- * @param mode        how much to pull (single craft / stack / max)
+ * @param ingredients       ingredients to operate on
+ * @param mode              how much to pull (single craft / stack / max).
+ *                          Irrelevant if {@code pullAvailable} is false.
+ * @param pullAvailable     pull in-stock ingredients into the player's inventory
+ * @param triggerAutocraft  open autocraft popups for missing-but-craftable
+ *                          ingredients
  */
-public record PullIngredientsPayload(List<Ingredient> ingredients, PullMode mode) implements CustomPacketPayload {
+public record PullIngredientsPayload(List<Ingredient> ingredients,
+                                     PullMode mode,
+                                     boolean pullAvailable,
+                                     boolean triggerAutocraft) implements CustomPacketPayload {
 
     public static final Type<PullIngredientsPayload> TYPE =
             new Type<>(ResourceLocation.fromNamespaceAndPath(JackItToMe.MODID, "pull_ingredients"));
@@ -30,6 +50,10 @@ public record PullIngredientsPayload(List<Ingredient> ingredients, PullMode mode
             PullIngredientsPayload::ingredients,
             ByteBufCodecs.VAR_INT.map(PullMode::fromOrdinal, PullMode::ordinal),
             PullIngredientsPayload::mode,
+            ByteBufCodecs.BOOL,
+            PullIngredientsPayload::pullAvailable,
+            ByteBufCodecs.BOOL,
+            PullIngredientsPayload::triggerAutocraft,
             PullIngredientsPayload::new
     );
 

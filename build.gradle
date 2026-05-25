@@ -1,3 +1,14 @@
+// Apache Batik — used by the rasterizeIcons task below to convert SVG masters
+// into PNG textures at build time. buildscript scope means Batik is on the
+// build classpath only; nothing about it ends up in the mod jar.
+buildscript {
+    repositories { mavenCentral() }
+    dependencies {
+        classpath 'org.apache.xmlgraphics:batik-transcoder:1.17'
+        classpath 'org.apache.xmlgraphics:batik-codec:1.17'
+    }
+}
+
 plugins {
     id 'java-library'
     id 'maven-publish'
@@ -120,14 +131,110 @@ dependencies {
     runtimeOnly "curse.maven:guideme-1173950:${guideme_curse_file_id}"
 
     // ---- Refined Storage (optional integration) ----
-    // NOTE: RsItemSource.java is still stubbed with reflective lookups. The dep
-    // is here so you can replace the stubs with direct API calls; runtime
-    // inclusion lets you test in-game once the stubs are filled in.
     compileOnly "curse.maven:refined-storage-243076:${rs_curse_file_id}"
     runtimeOnly "curse.maven:refined-storage-243076:${rs_curse_file_id}"
 }
 
+// ---- SVG → PNG rasterization -----------------------------------------------
+//
+// One source of truth for each icon: the SVG. The PNGs are derived artifacts
+// regenerated on every build, so editing an SVG and rebuilding is all you
+// need. The PNGs land back into src/main/resources/ so processResources
+// picks them up naturally; .gitignore excludes them so the repo stays clean.
+//
+// Each entry: input SVG path, output PNG path, target width, target height.
+def iconMappings = [
+    [src: 'src/main/resources/icon.svg',
+     dst: 'src/main/resources/icon.png',
+     w: 256, h: 256],
+    [src: 'src/main/resources/icon-transparent.svg',
+     dst: 'src/main/resources/assets/jackittome/textures/gui/jack_button.png',
+     w: 16, h: 16],
+]
+
+tasks.register('rasterizeIcons') {
+    group = 'jackittome'
+    description = 'Rasterize all SVG icons in src/main/resources/ to PNGs.'
+
+    inputs.files(iconMappings*.src)
+    outputs.files(iconMappings*.dst)
+
+    doLast {
+        iconMappings.each { m ->
+            def srcFile = file(m.src)
+            def dstFile = file(m.dst)
+            dstFile.parentFile.mkdirs()
+
+            // Apache Batik does the SVG render. KEY_WIDTH / KEY_HEIGHT force
+            // the output dimensions. For tiny targets (16×16) we render at 8×
+            // first and then crisp-downsample via Java2D — direct rendering at
+            // 16×16 produces mushy edges because the rasterizer's antialiasing
+            // has too few pixels to work with.
+            def renderW = m.w < 64 ? m.w * 8 : m.w
+            def renderH = m.h < 64 ? m.h * 8 : m.h
+
+            def transcoder = new org.apache.batik.transcoder.image.PNGTranscoder()
+            transcoder.addTranscodingHint(
+                    org.apache.batik.transcoder.image.PNGTranscoder.KEY_WIDTH,
+                    (float) renderW)
+            transcoder.addTranscodingHint(
+                    org.apache.batik.transcoder.image.PNGTranscoder.KEY_HEIGHT,
+                    (float) renderH)
+
+            def intermediate = new java.io.ByteArrayOutputStream()
+            srcFile.withInputStream { input ->
+                transcoder.transcode(
+                        new org.apache.batik.transcoder.TranscoderInput(input),
+                        new org.apache.batik.transcoder.TranscoderOutput(intermediate))
+            }
+
+            // If we rendered oversized, downsample with bicubic filtering to
+            // the actual target size for a crisp result.
+            if (renderW != m.w || renderH != m.h) {
+                def big = javax.imageio.ImageIO.read(
+                        new java.io.ByteArrayInputStream(intermediate.toByteArray()))
+                def small = new java.awt.image.BufferedImage(
+                        m.w, m.h, java.awt.image.BufferedImage.TYPE_INT_ARGB)
+                def g = small.createGraphics()
+                g.setRenderingHint(
+                        java.awt.RenderingHints.KEY_INTERPOLATION,
+                        java.awt.RenderingHints.VALUE_INTERPOLATION_BICUBIC)
+                g.setRenderingHint(
+                        java.awt.RenderingHints.KEY_RENDERING,
+                        java.awt.RenderingHints.VALUE_RENDER_QUALITY)
+                g.drawImage(big, 0, 0, m.w, m.h, null)
+                g.dispose()
+                javax.imageio.ImageIO.write(small, 'PNG', dstFile)
+            } else {
+                dstFile.bytes = intermediate.toByteArray()
+            }
+            logger.lifecycle("Rasterized ${m.src} -> ${m.dst} (${m.w}x${m.h})")
+        }
+    }
+}
+
+// sourcesJar packages everything under src/main/resources/ into a -sources jar.
+// rasterizeIcons writes generated PNGs into that same tree, so sourcesJar has
+// an implicit dependency on it. Declare it explicitly to satisfy Gradle's
+// task validator (and keep ordering deterministic).
+tasks.named('sourcesJar').configure {
+    dependsOn 'rasterizeIcons'
+    // Don't ship the derived PNGs in the sources jar — only the SVG masters
+    // are "sources". Keeps the sources jar a touch smaller and avoids
+    // confusing anyone who downloads it expecting to see source code only.
+    exclude 'icon.png'
+    exclude 'icon-transparent.png'
+    exclude 'assets/jackittome/textures/gui/jack_button.png'
+}
+
 tasks.named('processResources', ProcessResources).configure {
+    // Make sure PNGs exist before resources are processed.
+    dependsOn 'rasterizeIcons'
+
+    // SVGs are source-only — exclude them from the final jar (the PNGs we
+    // generate from them are what the game actually loads).
+    exclude '**/*.svg'
+
     var replaceProperties = [
         minecraft_version       : minecraft_version,
         minecraft_version_range : minecraft_version_range,

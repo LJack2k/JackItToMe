@@ -72,6 +72,29 @@ public final class ClientEvents {
         JackAnimations.render(event.getGuiGraphics(), event.getScreen());
     }
 
+    /**
+     * Clear stale availability data when the JEI recipe screen closes. The
+     * button controller's {@code drawExtras} stops firing as soon as the
+     * screen is gone, so the normal "mouse left the button" path through
+     * {@code AvailabilityCache.endHover} doesn't run if the screen was
+     * closed while the button was still hovered. Without this, reopening a
+     * recipe view (potentially against a different open container) would
+     * paint the previous session's overlays until the user re-hovered the
+     * J button.
+     */
+    @SubscribeEvent
+    public static void onScreenClosing(ScreenEvent.Closing event) {
+        Screen s = event.getScreen();
+        if (s == null) return;
+        // Cheap class-name filter — JEI's recipe view classes all contain
+        // 'jei' AND 'recipe' in their FQN. Other JEI screens (config, etc.)
+        // don't, so we don't false-trigger.
+        String fqn = s.getClass().getName().toLowerCase();
+        if (fqn.contains("jei") && fqn.contains("recipe")) {
+            AvailabilityCache.clear();
+        }
+    }
+
     private static void handleJackHovered(Minecraft mc) {
         // First check: are we inside a JEI recipe view? If so, the slot under the
         // mouse might accept many variants (the cycling "any plank" case). Get
@@ -87,14 +110,27 @@ public final class ClientEvents {
                 JackItToMe.LOGGER.debug("[JackItToMe] Jack key pressed but no hovered item found.");
                 return;
             }
-            JackItToMe.LOGGER.info("[JackItToMe] Requesting 1x {} from open container.",
-                    hovered.getHoverName().getString());
             ing = Ingredient.of(hovered);
         }
 
-        // No optimistic animation — we wait for the server's JackFeedbackPayload
-        // response and animate based on the actual outcome.
-        PacketDistributor.sendToServer(new PullIngredientsPayload(List.of(ing), PullMode.SINGLE));
+        // Modifier keys decide how much to pull. Ctrl wins over Shift if both
+        // are held. We query Minecraft's keyboard state directly because
+        // ScreenEvent.KeyPressed.Pre doesn't reliably carry modifier bits.
+        PullMode mode;
+        if (Screen.hasControlDown()) {
+            mode = PullMode.MAX;
+        } else if (Screen.hasShiftDown()) {
+            mode = PullMode.STACK;
+        } else {
+            mode = PullMode.SINGLE;
+        }
+        JackItToMe.LOGGER.info("[JackItToMe] Jack key pressed — mode={}", mode);
+
+        // P keybind always wants both: pull if it's in stock, escalate to the
+        // autocraft popup if it's not in stock but craftable. No optimistic
+        // animation — we wait for the server's JackFeedbackPayload response.
+        PacketDistributor.sendToServer(new PullIngredientsPayload(
+                List.of(ing), mode, /*pullAvailable=*/ true, /*triggerAutocraft=*/ true));
     }
 
     /**
