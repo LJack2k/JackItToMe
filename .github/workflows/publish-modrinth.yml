@@ -65,8 +65,13 @@ jobs:
           # Modrinth-only dependency entries — CurseForge IDs live in
           # publish-curseforge.yml. Slugs come from each mod's Modrinth URL
           # (modrinth.com/mod/<slug>).
+          #
+          # All three recipe viewers are OPTIONAL — the mod works with any one
+          # of them (or none). JEI was required pre-0.5.0; EMI/REI added in 0.5.0.
           dependencies: |
-            jei(required){modrinth:jei}
+            jei(optional){modrinth:jei}
+            emi(optional){modrinth:emi}
+            rei(optional){modrinth:rei}
             ae2(optional){modrinth:ae2}
             refined-storage(optional){modrinth:refined-storage}
 

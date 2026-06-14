@@ -8,6 +8,8 @@ import com.refinedmods.refinedstorage.common.api.RefinedStorageClientApi;
 import com.refinedmods.refinedstorage.common.support.resource.ItemResource;
 
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.world.item.ItemStack;
 
 import java.util.List;
@@ -39,12 +41,25 @@ public final class RsAutocraftClient {
             // RS uses long for amounts; clamp to ≥1.
             long initial = Math.max(1, (long) amount);
             ResourceAmount request = new ResourceAmount(resource, initial);
-            // parentScreen is @Nullable in the RS API; we pass the current screen
-            // when there is one so RS's "back" navigation lands on whatever the
-            // player was looking at (JEI recipe view, the grid screen, etc.).
+            // RS's autocraft preview is a MENU-BACKED screen (AbstractAmountScreen
+            // over AutocraftingPreviewContainerMenu). If we open it while a recipe
+            // viewer (JEI/EMI/REI) screen is showing, the menu transition fights
+            // the viewer's own recipe screen and the two bounce open/closed
+            // forever. The cure is to return RS to the container screen the
+            // recipe view is hosted over (the RS grid) — RS's normal context —
+            // not the viewer's recipe screen.
+            Screen current = Minecraft.getInstance().screen;
+            Screen parent;
+            if (current instanceof AbstractContainerScreen<?>) {
+                parent = current; // already at the grid/terminal
+            } else {
+                // In a recipe viewer (or no screen): ask the active viewer bridge
+                // for the underlying container screen to return to.
+                parent = ClientEvents.activeBridge().getHostContainerScreen();
+            }
             RefinedStorageClientApi.INSTANCE.openAutocraftingPreview(
                     List.of(request),
-                    Minecraft.getInstance().screen);
+                    parent);
         } catch (Throwable t) {
             JackItToMe.LOGGER.debug("[RS] RsAutocraftClient.openPopup failed: {}", t.toString());
         }

@@ -119,53 +119,57 @@ animation — every animation reflects a server-confirmed outcome.
 ## 3. File map
 
 ```
-JackItToMe/                   (repo root = project root)
+JackItToMe/                          (repo root, holds shared config)
 ├── README.md
 ├── LICENSE
-├── AGENTS.md                 (this file)
-├── build.gradle              ModDevGradle config + rasterizeIcons task
-├── gradle.properties         All version pins live here
-├── gradle/wrapper/           Wrapper pinned to 8.10.2 — do not bump to 9.x
-├── settings.gradle
-├── libs/                     Local jars fallback (mods not on a public maven)
-└── src/main/
-    ├── java/nl/ljack2k/jackittome/
-    │   ├── JackItToMe.java                  Mod entry: packets, sources, client hooks
-    │   ├── network/
-    │   │   ├── PullMode.java                SINGLE | STACK | MAX
-    │   │   ├── PullIngredientsPayload.java  C→S: pull these ingredients
-    │   │   ├── JackFeedbackPayload.java     S→C: animation dispatch (success vs failure)
-    │   │   ├── CheckAvailabilityPayload.java     C→S: simulate this recipe's pull
-    │   │   ├── AvailabilityResponsePayload.java  S→C: per-slot shortage booleans
-    │   │   └── ModPackets.java              RegisterPayloadHandlersEvent listener
-    │   ├── server/
-    │   │   ├── PullHandler.java             Orchestrates per-ingredient pull + feedback
-    │   │   ├── IngredientResolver.java      Most-abundant variant picker
-    │   │   └── AvailabilityHandler.java     Simulates the pull, returns shortage list
-    │   ├── source/
-    │   │   ├── ItemSource.java              Source abstraction (match/count/extract)
-    │   │   ├── ItemSourceRegistry.java      Ordered list, first match wins
-    │   │   └── ContainerItemSource.java     Vanilla AbstractContainerMenu walker (fallback)
-    │   ├── client/
-    │   │   ├── KeyBindings.java             Mod-bus keybind registration
-    │   │   ├── ClientEvents.java            P-key handler, hover lookup, packet send
-    │   │   ├── ClientFeedback.java          Dispatches animation from feedback packet
-    │   │   ├── JackAnimations.java          Falling-into-hotbar + red-shake-fade visuals
-    │   │   ├── AvailabilityCache.java       Recipe→shortages cache, nonce-matched
-    │   │   └── JeiRecipeSlotProbe.java      Reflective: all-variants lookup for recipe-slot hover
-    │   ├── jei/
-    │   │   ├── JackItToMeJeiPlugin.java         @JeiPlugin; registers button factory
-    │   │   ├── JackPullRecipeButtonFactory.java IRecipeButtonControllerFactory
-    │   │   └── JackPullButtonController.java    IIconButtonController: button + shortage overlays
-    │   └── compat/
-    │       ├── ae2/Ae2ItemSource.java       AE2 MEStorage extraction (guarded by ModList)
-    │       └── rs/RsItemSource.java         RS 2.x Grid storage extraction
-    └── resources/
-        ├── META-INF/neoforge.mods.toml      Dep declarations; processResources expands ${...}
-        ├── pack.mcmeta
-        ├── icon.svg                         Mod icon source (rendered to icon.png at build)
-        ├── icon-transparent.svg             Button icon source (rendered to .../jack_button.png)
-        └── assets/jackittome/lang/en_us.json
+├── AGENTS.md                        (this file)
+├── build.gradle                     Minimal root build (empty stub)
+├── gradle.properties                Version pins (shared across subprojects)
+├── settings.gradle                  Registers the neoforge/ subproject
+├── gradle/wrapper/                  Wrapper pinned to 8.10.2 — do not bump to 9.x
+├── gradlew, gradlew.bat
+├── libs/                            Local jars fallback (shared)
+├── .github/workflows/               Per-branch CI (release.yml + publish-*.yml)
+└── neoforge/                        NeoForge subproject — the actual mod build
+    ├── build.gradle                 ModDevGradle config + rasterizeIcons task
+    └── src/main/
+        ├── java/nl/ljack2k/jackittome/
+        │   ├── JackItToMe.java                  Mod entry: packets, sources, client hooks
+        │   ├── network/
+        │   │   ├── PullMode.java                SINGLE | STACK | MAX
+        │   │   ├── PullIngredientsPayload.java  C→S: pull these ingredients
+        │   │   ├── JackFeedbackPayload.java     S→C: animation dispatch (success vs failure)
+        │   │   ├── CheckAvailabilityPayload.java     C→S: simulate this recipe's pull
+        │   │   ├── AvailabilityResponsePayload.java  S→C: per-slot shortage booleans
+        │   │   └── ModPackets.java              RegisterPayloadHandlersEvent listener
+        │   ├── server/
+        │   │   ├── PullHandler.java             Orchestrates per-ingredient pull + feedback
+        │   │   ├── IngredientResolver.java      Most-abundant variant picker
+        │   │   └── AvailabilityHandler.java     Simulates the pull, returns shortage list
+        │   ├── source/
+        │   │   ├── ItemSource.java              Source abstraction (match/count/extract)
+        │   │   ├── ItemSourceRegistry.java      Ordered list, first match wins
+        │   │   └── ContainerItemSource.java     Vanilla AbstractContainerMenu walker (fallback)
+        │   ├── client/
+        │   │   ├── KeyBindings.java             Mod-bus keybind registration
+        │   │   ├── ClientEvents.java            P-key handler, hover lookup, packet send
+        │   │   ├── ClientFeedback.java          Dispatches animation from feedback packet
+        │   │   ├── JackAnimations.java          Falling-into-hotbar + red-shake-fade visuals
+        │   │   ├── AvailabilityCache.java       Recipe→shortages cache, nonce-matched
+        │   │   └── JeiRecipeSlotProbe.java      Reflective: all-variants lookup for recipe-slot hover
+        │   ├── jei/
+        │   │   ├── JackItToMeJeiPlugin.java         @JeiPlugin; registers button factory
+        │   │   ├── JackPullRecipeButtonFactory.java IRecipeButtonControllerFactory
+        │   │   └── JackPullButtonController.java    IIconButtonController: button + shortage overlays
+        │   └── compat/
+        │       ├── ae2/Ae2ItemSource.java       AE2 MEStorage extraction (guarded by ModList)
+        │       └── rs/RsItemSource.java         RS 2.x Grid storage extraction
+        └── resources/
+            ├── META-INF/neoforge.mods.toml      Dep declarations; processResources expands ${...}
+            ├── pack.mcmeta
+            ├── icon.svg                         Mod icon source (rendered to icon.png at build)
+            ├── icon-transparent.svg             Button icon source (rendered to .../jack_button.png)
+            └── assets/jackittome/lang/en_us.json
 ```
 
 `icon.png`, `icon-transparent.png`, and `assets/jackittome/textures/gui/jack_button.png`
@@ -386,11 +390,17 @@ from the jar (`exclude '**/*.svg'`); only PNGs ship.
 ## 6. Build & test
 
 ```bash
-# From the project root (D:\Projects\JackItToMe)
-./gradlew rasterizeIcons     # regenerates PNGs from SVGs (also auto-runs in build)
-./gradlew build              # produces build/libs/JackItToMe-neoforge-1.21.1-VERSION.jar
-./gradlew runClient          # dev client with the mod loaded
-./gradlew runServer          # dedicated server
+# From the repo root (D:\Projects\JackItToMe). All loader-specific output
+# lives in neoforge/. Bare invocations cascade into all subprojects
+# (currently just :neoforge), so either form below works.
+./gradlew rasterizeIcons              # regenerates PNGs from SVGs (also auto-runs in build)
+./gradlew build                       # → neoforge/build/libs/JackItToMe-neoforge-1.21.1-VERSION.jar
+./gradlew runClient                   # dev client with the mod loaded
+./gradlew runServer                   # dedicated server
+
+# Equivalent qualified forms (preferred once more loaders exist):
+./gradlew :neoforge:build
+./gradlew :neoforge:runClient
 ```
 
 JEI, AE2, RS, guideme are pulled via CurseMaven at runtime.
@@ -475,3 +485,28 @@ When you finish a change, mention:
 3. Whether you touched any of the fragile bits in §5 — if yes, what version
    of JEI/AE2/RS you verified against.
 4. Anything you noticed that contradicts this brief. Then update this brief.
+
+---
+
+## 9. Multi-MC-version strategy
+
+This branch builds the mod for Minecraft 1.21.1 / NeoForge 21.1.x. Other MC
+versions live on parallel branches (`26.1.2`, etc.). Within each branch the
+layout is identical: root holds shared config, `neoforge/` holds the loader
+build. If Forge or Fabric ever land, they slot in as sibling subprojects
+(`forge/`, `fabric/`) registered in `settings.gradle` — no other
+restructuring needed.
+
+**Tag convention:** `v{mcversion}-{modversion}`, e.g. `v1.21.1-0.4.2`. Each
+branch's tag triggers its own `release.yml`. The mc-publish step uploads to
+CurseForge + Modrinth tagged with that branch's MC version.
+
+**Feature development workflow:** Develop on the oldest supported branch
+(currently `1.21.1`) and cherry-pick forward to newer branches with
+`git cherry-pick -x` (the `-x` records the original SHA in the message).
+Enable `git rerere` globally (`git config --global rerere.enabled true`) so
+recurring conflict resolutions auto-apply across the chain of cherry-picks.
+
+**CI maintenance:** Workflow files live in each branch's
+`.github/workflows/`. When fixing a CI bug, cherry-pick the workflow edits
+to every supported branch — just like any other change.

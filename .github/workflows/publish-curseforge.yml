@@ -79,8 +79,13 @@ jobs:
           # publish-modrinth.yml. mc-publish ignores curly-brace pairs for
           # platforms it doesn't have credentials for, but splitting per
           # workflow keeps each file readable.
+          #
+          # All three recipe viewers are OPTIONAL — the mod works with any one
+          # of them (or none). JEI was required pre-0.5.0; EMI/REI added in 0.5.0.
           dependencies: |
-            jei(required){curseforge:238222}
+            jei(optional){curseforge:238222}
+            emi(optional){curseforge:580555}
+            roughly-enough-items(optional){curseforge:310111}
             applied-energistics-2(optional){curseforge:223794}
             refined-storage(optional){curseforge:243076}
 
