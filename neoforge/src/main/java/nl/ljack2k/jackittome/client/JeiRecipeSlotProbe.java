@@ -33,7 +33,7 @@ import java.util.stream.Stream;
  * Reflection is bounded: we cap recursion depth at 4 and refuse to descend
  * into {@code java.*} or {@code net.minecraft.*} classes.
  */
-final class JeiRecipeSlotProbe {
+public final class JeiRecipeSlotProbe {
     private JeiRecipeSlotProbe() {}
 
     /** Maximum reflective recursion depth into the JEI object graph. */
@@ -43,7 +43,7 @@ final class JeiRecipeSlotProbe {
      * @return all acceptable ItemStacks for the recipe slot at the given
      *         cursor position, or an empty list if no slot was found there.
      */
-    static List<ItemStack> getAllItemsUnderMouse(Screen jeiScreen, double mouseX, double mouseY) {
+    public static List<ItemStack> getAllItemsUnderMouse(Screen jeiScreen, double mouseX, double mouseY) {
         if (jeiScreen == null) return List.of();
         try {
             return probe(jeiScreen, mouseX, mouseY, 0);

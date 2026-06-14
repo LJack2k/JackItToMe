@@ -1,0 +1,293 @@
+// Apache Batik — used by the rasterizeIcons task below to convert SVG masters
+// into PNG textures at build time. buildscript scope means Batik is on the
+// build classpath only; nothing about it ends up in the mod jar.
+buildscript {
+    repositories { mavenCentral() }
+    dependencies {
+        classpath 'org.apache.xmlgraphics:batik-transcoder:1.17'
+        classpath 'org.apache.xmlgraphics:batik-codec:1.17'
+    }
+}
+
+plugins {
+    id 'java-library'
+    id 'maven-publish'
+    // ModDevGradle — the modern way to develop NeoForge mods. Check
+    // https://github.com/neoforged/ModDevGradle for the latest version.
+    id 'net.neoforged.moddev' version '1.0.20'
+}
+
+version = mod_version
+group = mod_group_id
+
+java {
+    toolchain.languageVersion = JavaLanguageVersion.of(21)
+    withSourcesJar()
+}
+
+base {
+    // Produces jars named like JackItToMe-neoforge-1.21.1-1.0.0.jar — matches
+    // the convention used by most published NeoForge mods on CurseForge / Modrinth.
+    archivesName = "${mod_name}-neoforge-${minecraft_version}"
+}
+
+repositories {
+    mavenCentral()
+    maven {
+        name = 'NeoForged'
+        url = 'https://maven.neoforged.net/releases'
+    }
+    maven {
+        name = 'ParchmentMC'
+        url = 'https://maven.parchmentmc.org/'
+    }
+    // CurseMaven — public proxy for CurseForge mod files. Single source for all
+    // our mod-specific deps (JEI, AE2, RS). Look up coordinates per file via the
+    // CurseForge file page's "Curse Maven Snippet" panel.
+    maven { name = 'TerraformersMC (EMI)'; url = 'https://maven.terraformersmc.com/releases' }
+    maven { name = 'Shedaniel (REI)';     url = 'https://maven.shedaniel.me/'              }
+    maven { name = 'Architectury';        url = 'https://maven.architectury.dev/'           }
+    maven {
+        name = 'CurseMaven'
+        url = 'https://www.cursemaven.com'
+        content {
+            includeGroup 'curse.maven'
+        }
+    }
+    // BlameJared maven — alternative source for JEI if CurseMaven is unavailable.
+    // maven { name = 'BlameJared (JEI)'; url = 'https://maven.blamejared.com' }
+
+    // Local jars fallback — drop jars into libs/ if you need a version CurseMaven
+    // doesn't have or want to test against a build that isn't on CurseForge.
+    flatDir {
+        dirs 'libs'
+    }
+    // modmaven.dev only hosts AE2 up to 19.0.4. Re-enable if you ever want older AE2.
+    // maven { name = 'Modmaven (AE2)'; url = 'https://modmaven.dev' }
+    //
+    // Refined Mods maven — only needed if you re-enable RS runtimeOnly.
+    // maven { name = 'Refined Mods'; url = 'https://maven.refinedmods.com/releases' }
+}
+
+neoForge {
+    version = neo_version
+
+    // Parchment mappings are optional — they give nicer parameter names in
+    // decompiled Minecraft code but the mod compiles fine without them. Re-enable
+    // once you've picked a real version from:
+    //   https://maven.parchmentmc.org/org/parchmentmc/data/parchment-1.21/
+    // (Browse the URL in a web browser to see the version directories.)
+    //
+    // parchment {
+    //     mappingsVersion = parchment_mappings_version
+    //     minecraftVersion = parchment_minecraft_version
+    // }
+
+    runs {
+        client {
+            client()
+            systemProperty 'forge.logging.markers', 'REGISTRIES'
+            systemProperty 'forge.logging.console.level', 'debug'
+            // Launch at near-full-screen size. There's no actual "maximize"
+            // program arg in Minecraft, but matching your monitor resolution
+            // (minus title-bar height) gets the same effect. Adjust to your
+            // own display if 1920x1040 doesn't match.
+            //
+            // Alternatives:
+            //   programArguments.add '--fullscreen'   // true fullscreen, no title bar
+            //   programArguments.addAll '--width', '2560', '--height', '1400'  // 1440p monitor
+            programArguments.addAll '--width', '1920', '--height', '1000'
+        }
+        server {
+            server()
+            programArgument '--nogui'
+        }
+        data {
+            data()
+            programArguments.addAll '--mod', mod_id, '--all', '--output', file('src/generated/resources/').getAbsolutePath()
+        }
+    }
+
+    mods {
+        "${mod_id}" {
+            sourceSet sourceSets.main
+        }
+    }
+}
+
+dependencies {
+    // All three deps come from CurseMaven. Coordinate format:
+    //   curse.maven:<slug>-<projectId>:<fileId>
+    // The slug-projectId pair is stable per mod; the fileId is per-release.
+    // To bump versions: open the CurseForge file page, copy "Curse Maven Snippet",
+    // and update gradle.properties.
+
+    // All three recipe viewers are compiled against (compileOnly) so the JEI,
+    // EMI and REI integration code always builds. At RUNTIME, though, only one
+    // viewer should be present — JEI and REI actively conflict, and our
+    // ClientEvents.initBridge() picks the first viewer it finds (JEI > EMI > REI),
+    // so loading several at once would mask the others.
+    //
+    // The `recipeViewer` Gradle property selects which viewer is on the run
+    // classpath. Default is `jei` (the original behaviour). Examples:
+    //   ./gradlew :neoforge:runClient                      → JEI
+    //   ./gradlew :neoforge:runClient -PrecipeViewer=emi   → EMI only
+    //   ./gradlew :neoforge:runClient -PrecipeViewer=rei   → REI only
+    //   ./gradlew :neoforge:runClient -PrecipeViewer=none  → no viewer
+    def recipeViewer = (project.findProperty('recipeViewer') ?: 'jei').toString().toLowerCase()
+
+    // ---- JEI ----
+    compileOnly "curse.maven:jei-238222:${jei_curse_file_id}"
+    if (recipeViewer == 'jei') {
+        runtimeOnly "curse.maven:jei-238222:${jei_curse_file_id}"
+    }
+
+    // ---- AE2 (optional integration) ----
+    // guideme is a transitive dep that AE2 needs at runtime. compileOnly is
+    // skipped because our code never touches guideme classes.
+    compileOnly "curse.maven:applied-energistics-2-223794:${ae2_curse_file_id}"
+    runtimeOnly "curse.maven:applied-energistics-2-223794:${ae2_curse_file_id}"
+    runtimeOnly "curse.maven:guideme-1173950:${guideme_curse_file_id}"
+
+    // ---- Refined Storage (optional integration) ----
+    compileOnly "curse.maven:refined-storage-243076:${rs_curse_file_id}"
+    runtimeOnly "curse.maven:refined-storage-243076:${rs_curse_file_id}"
+
+    // ---- EMI (optional recipe viewer) ----
+    compileOnly "dev.emi:emi-neoforge:${emi_version}:api"
+    if (recipeViewer == 'emi') {
+        runtimeOnly "dev.emi:emi-neoforge:${emi_version}"
+    }
+
+    // ---- REI (optional recipe viewer) ----
+    compileOnly "me.shedaniel:RoughlyEnoughItems-api-neoforge:${rei_version}"
+    if (recipeViewer == 'rei') {
+        runtimeOnly "me.shedaniel:RoughlyEnoughItems-neoforge:${rei_version}"
+    }
+
+    logger.lifecycle("[JackItToMe] Runtime recipe viewer: ${recipeViewer}")
+}
+
+// ---- SVG → PNG rasterization -----------------------------------------------
+//
+// One source of truth for each icon: the SVG. The PNGs are derived artifacts
+// regenerated on every build, so editing an SVG and rebuilding is all you
+// need. The PNGs land back into src/main/resources/ so processResources
+// picks them up naturally; .gitignore excludes them so the repo stays clean.
+//
+// Each entry: input SVG path, output PNG path, target width, target height.
+def iconMappings = [
+    [src: 'src/main/resources/icon.svg',
+     dst: 'src/main/resources/icon.png',
+     w: 256, h: 256],
+    [src: 'src/main/resources/icon-transparent.svg',
+     dst: 'src/main/resources/assets/jackittome/textures/gui/jack_button.png',
+     w: 16, h: 16],
+]
+
+tasks.register('rasterizeIcons') {
+    group = 'jackittome'
+    description = 'Rasterize all SVG icons in src/main/resources/ to PNGs.'
+
+    inputs.files(iconMappings*.src)
+    outputs.files(iconMappings*.dst)
+
+    doLast {
+        iconMappings.each { m ->
+            def srcFile = file(m.src)
+            def dstFile = file(m.dst)
+            dstFile.parentFile.mkdirs()
+
+            // Apache Batik does the SVG render. KEY_WIDTH / KEY_HEIGHT force
+            // the output dimensions. For tiny targets (16×16) we render at 8×
+            // first and then crisp-downsample via Java2D — direct rendering at
+            // 16×16 produces mushy edges because the rasterizer's antialiasing
+            // has too few pixels to work with.
+            def renderW = m.w < 64 ? m.w * 8 : m.w
+            def renderH = m.h < 64 ? m.h * 8 : m.h
+
+            def transcoder = new org.apache.batik.transcoder.image.PNGTranscoder()
+            transcoder.addTranscodingHint(
+                    org.apache.batik.transcoder.image.PNGTranscoder.KEY_WIDTH,
+                    (float) renderW)
+            transcoder.addTranscodingHint(
+                    org.apache.batik.transcoder.image.PNGTranscoder.KEY_HEIGHT,
+                    (float) renderH)
+
+            def intermediate = new java.io.ByteArrayOutputStream()
+            srcFile.withInputStream { input ->
+                transcoder.transcode(
+                        new org.apache.batik.transcoder.TranscoderInput(input),
+                        new org.apache.batik.transcoder.TranscoderOutput(intermediate))
+            }
+
+            // If we rendered oversized, downsample with bicubic filtering to
+            // the actual target size for a crisp result.
+            if (renderW != m.w || renderH != m.h) {
+                def big = javax.imageio.ImageIO.read(
+                        new java.io.ByteArrayInputStream(intermediate.toByteArray()))
+                def small = new java.awt.image.BufferedImage(
+                        m.w, m.h, java.awt.image.BufferedImage.TYPE_INT_ARGB)
+                def g = small.createGraphics()
+                g.setRenderingHint(
+                        java.awt.RenderingHints.KEY_INTERPOLATION,
+                        java.awt.RenderingHints.VALUE_INTERPOLATION_BICUBIC)
+                g.setRenderingHint(
+                        java.awt.RenderingHints.KEY_RENDERING,
+                        java.awt.RenderingHints.VALUE_RENDER_QUALITY)
+                g.drawImage(big, 0, 0, m.w, m.h, null)
+                g.dispose()
+                javax.imageio.ImageIO.write(small, 'PNG', dstFile)
+            } else {
+                dstFile.bytes = intermediate.toByteArray()
+            }
+            logger.lifecycle("Rasterized ${m.src} -> ${m.dst} (${m.w}x${m.h})")
+        }
+    }
+}
+
+// sourcesJar packages everything under src/main/resources/ into a -sources jar.
+// rasterizeIcons writes generated PNGs into that same tree, so sourcesJar has
+// an implicit dependency on it. Declare it explicitly to satisfy Gradle's
+// task validator (and keep ordering deterministic).
+tasks.named('sourcesJar').configure {
+    dependsOn 'rasterizeIcons'
+    // Don't ship the derived PNGs in the sources jar — only the SVG masters
+    // are "sources". Keeps the sources jar a touch smaller and avoids
+    // confusing anyone who downloads it expecting to see source code only.
+    exclude 'icon.png'
+    exclude 'icon-transparent.png'
+    exclude 'assets/jackittome/textures/gui/jack_button.png'
+}
+
+tasks.named('processResources', ProcessResources).configure {
+    // Make sure PNGs exist before resources are processed.
+    dependsOn 'rasterizeIcons'
+
+    // SVGs are source-only — exclude them from the final jar (the PNGs we
+    // generate from them are what the game actually loads).
+    exclude '**/*.svg'
+
+    var replaceProperties = [
+        minecraft_version       : minecraft_version,
+        minecraft_version_range : minecraft_version_range,
+        neo_version             : neo_version,
+        neo_version_range       : neo_version_range,
+        loader_version_range    : loader_version_range,
+        mod_id                  : mod_id,
+        mod_name                : mod_name,
+        mod_license             : mod_license,
+        mod_version             : mod_version,
+        mod_authors             : mod_authors,
+        mod_description         : mod_description
+    ]
+    inputs.properties replaceProperties
+
+    filesMatching(['META-INF/neoforge.mods.toml']) {
+        expand replaceProperties
+    }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+}
