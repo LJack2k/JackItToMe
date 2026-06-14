@@ -1,8 +1,12 @@
 # JackItToMe
 
 A NeoForge 1.21.x mod that pulls items from whatever inventory you have open
-into your own — either one item at a time via a keybind, or a whole recipe's
-worth via a button on JEI's recipe screen.
+into your own — either one item at a time with a keybind, or a whole recipe's
+worth with a button on your recipe viewer's recipe screen.
+
+Works with **JEI**, **EMI**, or **REI** — install whichever you already use.
+
+📦 **Download:** [CurseForge](https://www.curseforge.com/minecraft/mc-mods/jack-it-to-me) · [Modrinth](https://modrinth.com/mod/jackittome)
 
 ## Two ways to grab items
 
@@ -25,114 +29,89 @@ Ctrl beats Shift if you hold both.
 **Autocraft escalation:** if the hovered item isn't in stock but your open
 AE2/RS network has a pattern for it, pressing P opens the native autocraft
 popup pre-filled with the amount your modifier asked for (1 / 64 / a lot).
-This works seamlessly whether you're hovering JEI's sidebar, a bookmark, or
-a slot inside a recipe view.
 
 Works on:
 
 - Vanilla container slots (chest, barrel, shulker, etc.)
-- Items in the JEI right-side ingredient list
-- Items in the JEI left-side bookmarks
-- Items in the JEI bottom-left recipe history
-- Slots inside a JEI recipe view — including the cycling "any planks" tag
-  slots, where all variants are considered and whichever you actually have
-  is what gets pulled
+- Items in your recipe viewer's item list and favorites/bookmarks
+- Slots inside a recipe view — including the cycling "any planks" tag slots,
+  where all variants are considered and whichever you actually have is what
+  gets pulled
 
 ### 2. Per-recipe button: start crafting (and optionally pull what's ready)
 
-While viewing any recipe in JEI, a chest-icon **J** button appears next to
-JEI's own bookmark/+ buttons. Hover it to preview the state of each slot,
-then click to act on the recipe.
+While viewing any recipe, a chest-icon **J** button appears on the recipe.
+Hover it to preview the state of each slot, then click to act on the recipe.
 
-- **Hover** the button: each input slot is checked against your open
-  storage. Refreshes every 750ms while you stay on the button.
-  - **Red overlay** = missing, and no AE2/RS pattern can produce it.
-  - **Green overlay** = missing, but your network can autocraft it.
-  - **No overlay** = in stock.
+- **Hover** the button: each input slot is checked against your open storage,
+  refreshing every ¾ second while you stay on the button.
+  - **Red** = missing, and no AE2/RS pattern can produce it.
+  - **Green** = missing, but your network can autocraft it.
+  - **Clear** = in stock.
 - **Click** the button:
-  - If every ingredient is in stock (no shortage): pulls them all into
-    your inventory. The straightforward case.
-  - If any ingredient is missing: triggers autocraft popups (one after
-    the next) for the missing-but-craftable ones. **Does not pull
-    anything** — even items that are in stock stay in storage until
-    you Shift+click separately.
-- **Shift+Click** the button: always pulls every in-stock ingredient,
-  **and** triggers autocraft popups for any missing-but-craftable ones.
+  - If every ingredient is in stock: pulls them all into your inventory.
+  - If any ingredient is missing: triggers autocraft popups (one after the
+    next) for the missing-but-craftable ones. **Does not pull anything** —
+    even in-stock items stay in storage until you Shift+click.
+- **Shift+Click**: always pulls every in-stock ingredient **and** triggers
+  autocraft popups for any missing-but-craftable ones.
 
-The rule in one sentence: Shift is the "always pull" modifier. Plain click
-pulls only when there's nothing to autocraft; otherwise it leaves your
+The rule in one sentence: Shift is the "always pull" modifier; plain click
+pulls only when there's nothing to autocraft, otherwise it leaves your
 inventory alone so you can review the autocraft popups without committing.
 
-Where items come from for both modes:
+## Recipe viewers
 
-- Any vanilla `AbstractContainerMenu` open behind the cursor (chest, barrel,
-  shulker, the player's own inventory)
-- Applied Energistics 2 ME networks (any terminal-shaped menu)
-- Refined Storage 2 grids (normal, crafting, pattern, wireless, portable)
+Install any **one** of these (or none). The mod adapts to whichever it finds:
+
+| Viewer | Pull button | Hover tooltip | Red/green slot overlays |
+| ------ | :---------: | :-----------: | :---------------------: |
+| **JEI** | ✅ | ✅ | ✅ |
+| **REI** | ✅ | ✅ | ✅ |
+| **EMI** | ✅ | ✅ | — (counts shown in the tooltip instead) |
+
+Without any viewer installed the mod still works for the **P** keybind on
+vanilla container slots — you just won't get the recipe button or the ability
+to pull from a viewer's item list.
+
+## Where items come from
+
+Both modes pull from the menu open behind the cursor:
+
+- Any vanilla container (chest, barrel, shulker, your own inventory)
+- **Applied Energistics 2** ME networks (any terminal-shaped menu)
+- **Refined Storage 2** grids (normal, crafting, pattern, wireless, portable)
+
+Without AE2 or RS the mod still works for vanilla containers; with either or
+both installed, the corresponding source activates automatically — respecting
+that storage system's own access/security rules.
 
 ## Install
 
-Drop the built jar into your `mods/` folder alongside:
+Drop the jar into your `mods/` folder alongside:
 
 - **NeoForge 1.21.1** (≥ 21.1.181) — required
-- **JEI** ≥ 19.0.0 — required (client-side)
-- **AE2** ≥ 19.0.0 — optional, enables the ME-network source
-- **Refined Storage 2** ≥ 2.0.0 — optional, enables the RS-grid source
-
-Without AE2 or RS the mod still works for vanilla containers; with either or
-both installed, the corresponding source activates automatically.
+- A recipe viewer — **JEI** (≥ 19), **EMI** (≥ 1.1), or **REI** (≥ 16) —
+  recommended (needed for the recipe button and viewer-list pulling)
+- **AE2** (≥ 19) — optional, enables the ME-network source
+- **Refined Storage 2** (≥ 2.0) — optional, enables the RS-grid source
 
 ## Configuring
 
 Rebind the keybind from **Options → Controls → JackItToMe → Jack hovered
-item**. Default is **P**.
+item**. Default is **P**. No other configuration needed.
 
-No other configuration needed.
+## Links
 
-## Building from source
+- [CurseForge](https://www.curseforge.com/minecraft/mc-mods/jack-it-to-me)
+- [Modrinth](https://modrinth.com/mod/jackittome)
+- [Source & issue tracker on GitHub](https://github.com/LJack2k/JackItToMe)
 
-Requires JDK 21. From the project root:
+## Contributing & technical docs
 
-```
-./gradlew build
-```
-
-The output lands at `build/libs/JackItToMe-neoforge-1.21.1-VERSION.jar`. To
-launch a dev client with the mod loaded:
-
-```
-./gradlew runClient
-```
-
-First run downloads Minecraft, NeoForge, JEI, AE2, and RS via CurseMaven.
-Subsequent launches are cached and start in ~30 seconds.
-
-## How it works (in a paragraph)
-
-The keybind and the button both send a `PullIngredientsPayload` (with
-`pullAvailable` + `triggerAutocraft` flags) to the server. The server
-resolves the player's open menu against an ordered `ItemSource` registry
-(AE2 and RS register at higher priority than the vanilla container
-fallback). It simulates the pull first to compute per-ingredient shortfalls
-against the source's actual stock; then, if `pullAvailable`, extracts the
-in-stock portion via the source's official API (so AE2 security stations,
-RS access modes, vanilla `mayPickup`, and modded slot restrictions are all
-respected). For each ingredient still short and reported as craftable by
-the source, the server queues a popup via `AutocraftChainPayload`; the
-client opens them one at a time, advancing on the close of each popup
-flow. A `JackFeedbackPayload` carries the list of items actually moved
-(one staggered fan-out animation per unique pulled type), plus an optional
-failure item for the red-shake. For the button's hover preview the client
-sends a `CheckAvailabilityPayload` which the server answers with a
-per-slot `(shortage, craftable)` pair; `JackPullButtonController.drawExtras`
-paints red or green overlays from that via JEI's universal recipe-button
-factory hook (no per-recipe-type decorator registration needed).
+Building from source, how it works under the hood, and the project layout
+are in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
-MIT — see `LICENSE`.
-
-## Architecture notes for contributors
-
-See `AGENTS.md` for a brief on the layout, design decisions, fragile bits to
-watch for, and the smoke-test flow.
+MIT — see [LICENSE](LICENSE).
