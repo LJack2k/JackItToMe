@@ -18,7 +18,6 @@ import mezz.jei.api.recipe.RecipeIngredientRole;
 import nl.ljack2k.jackittome.client.AvailabilityCache;
 import nl.ljack2k.jackittome.network.CheckAvailabilityPayload;
 
-import net.minecraft.ChatFormatting;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.renderer.Rect2i;
@@ -114,71 +113,11 @@ public class JackPullButtonController implements IIconButtonController {
 
     @Override
     public void getTooltips(ITooltipBuilder tooltip) {
-        // Count only non-empty ingredient slots — recipes with empty cells
-        // (e.g. crafting table 3x3 with hollow centers) shouldn't inflate the count.
-        List<Ingredient> ingredients = collectInputIngredients();
-        int total = (int) ingredients.stream().filter(i -> !i.isEmpty()).count();
-
-        // Pull the same availability data the overlays use. Null lists mean
-        // the server response hasn't arrived yet (or hover just started);
-        // in that case we show only the basic count.
-        Object recipe = layoutDrawable.getRecipe();
-        List<Boolean> shortages = AvailabilityCache.shortagesFor(recipe);
-        List<Boolean> craftable = AvailabilityCache.craftableFor(recipe);
-
-        int missingUncraftable = 0;
-        int missingCraftable = 0;
-        if (shortages != null) {
-            int n = Math.min(shortages.size(), ingredients.size());
-            for (int i = 0; i < n; i++) {
-                if (!shortages.get(i)) continue;
-                boolean canCraft = craftable != null && i < craftable.size() && craftable.get(i);
-                if (canCraft) missingCraftable++;
-                else missingUncraftable++;
-            }
-        }
-        int totalMissing = missingUncraftable + missingCraftable;
-
-        // Title.
-        tooltip.add(Component.translatable("jackittome.button.recipe_pull.title"));
-
-        // Counts. "All N available" reads nicer than "N ingredients needed, 0 missing".
-        if (shortages != null && totalMissing == 0) {
-            tooltip.add(Component.translatable("jackittome.button.recipe_pull.ready", total)
-                    .withStyle(ChatFormatting.GRAY));
-        } else {
-            tooltip.add(Component.translatable("jackittome.button.recipe_pull.total", total)
-                    .withStyle(ChatFormatting.GRAY));
-        }
-
-        // Breakdown — only show lines for non-zero categories.
-        if (missingUncraftable > 0) {
-            tooltip.add(Component.translatable(
-                            "jackittome.button.recipe_pull.missing", missingUncraftable)
-                    .withStyle(ChatFormatting.RED));
-        }
-        if (missingCraftable > 0) {
-            tooltip.add(Component.translatable(
-                            "jackittome.button.recipe_pull.craftable", missingCraftable)
-                    .withStyle(ChatFormatting.GREEN));
-        }
-
-        // Hint. Show only when holding Shift would do strictly more than a
-        // plain click — i.e. when there's BOTH a shortage AND something in
-        // stock. When all is in stock, plain click already pulls (no Shift
-        // needed). When nothing is in stock, Shift has nothing extra to pull.
-        // Two wordings differ on whether autocraft is also happening:
-        //   - mix of craftable + in-stock: "also pull" (plain click is
-        //     already triggering autocraft; Shift adds the pull on top)
-        //   - only uncraftable shortage + in-stock: plain click is a
-        //     no-op, so "pull what's in stock" without the "also".
-        int inStock = total - totalMissing;
-        if (shortages != null && inStock > 0 && totalMissing > 0) {
-            String key = (missingCraftable > 0)
-                    ? "jackittome.button.recipe_pull.shift_hint"
-                    : "jackittome.button.recipe_pull.shift_partial";
-            tooltip.add(Component.translatable(key)
-                    .withStyle(ChatFormatting.DARK_GRAY, ChatFormatting.ITALIC));
+        // Shared builder — same text JEI/EMI/REI all show, sourced from the
+        // shared AvailabilityCache (keyed on the recipe object).
+        for (Component line : nl.ljack2k.jackittome.client.PullTooltipBuilder.build(
+                layoutDrawable.getRecipe(), collectInputIngredients())) {
+            tooltip.add(line);
         }
     }
 

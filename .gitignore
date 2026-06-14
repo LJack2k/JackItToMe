@@ -1,12 +1,12 @@
 # Gradle
 .gradle/
-build/
-out/
-src/generated/
+**/build/
+**/out/
+**/src/generated/
 
 # NeoForge dev environment
-run/
-runs/
+**/run/
+**/runs/
 
 # IDE
 .idea/
@@ -22,9 +22,12 @@ libs/*.jar
 
 # PNGs derived from SVGs at build time by the rasterizeIcons Gradle task.
 # The SVG masters are the source of truth; the PNGs regenerate on every build.
-src/main/resources/icon.png
-src/main/resources/icon-transparent.png
-src/main/resources/assets/jackittome/textures/gui/jack_button.png
+**/src/main/resources/icon.png
+**/src/main/resources/icon-transparent.png
+**/src/main/resources/assets/jackittome/textures/gui/jack_button.png
+
+# This handover doc — delete after the restructure is complete.
+RESTRUCTURE-PLAN.md
 
 # OS
 .DS_Store

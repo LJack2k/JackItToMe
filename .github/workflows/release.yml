@@ -54,7 +54,7 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
           files: |
-            build/libs/!(*-sources).jar
+            **/build/libs/!(*-sources).jar
 
           name: JackItToMe-neoforge-1.21.1-${{ steps.ver.outputs.value }}.jar
           version: ${{ steps.ver.outputs.value }}
