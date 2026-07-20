@@ -27,8 +27,9 @@ Modifier keys change how much you pull:
 Ctrl beats Shift if you hold both.
 
 **Autocraft escalation:** if the hovered item isn't in stock but your open
-AE2/RS network has a pattern for it, pressing P opens the native autocraft
-popup pre-filled with the amount your modifier asked for (1 / 64 / a lot).
+storage network can craft it (AE2, Refined Storage, or Integrated Dynamics),
+pressing P opens that system's native autocraft popup pre-filled with the
+amount your modifier asked for (1 / 64 / a lot).
 
 Works on:
 
@@ -45,7 +46,7 @@ Hover it to preview the state of each slot, then click to act on the recipe.
 
 - **Hover** the button: each input slot is checked against your open storage,
   refreshing every ¾ second while you stay on the button.
-  - **Red** = missing, and no AE2/RS pattern can produce it.
+  - **Red** = missing, and no connected storage system can produce it.
   - **Green** = missing, but your network can autocraft it.
   - **Clear** = in stock.
 - **Click** the button:
@@ -81,10 +82,18 @@ Both modes pull from the menu open behind the cursor:
 - Any vanilla container (chest, barrel, shulker, your own inventory)
 - **Applied Energistics 2** ME networks (any terminal-shaped menu)
 - **Refined Storage 2** grids (normal, crafting, pattern, wireless, portable)
+- **Integrated Dynamics** networks via an **Integrated Terminals** storage
+  terminal (the cabled part or the portable one)
 
-Without AE2 or RS the mod still works for vanilla containers; with either or
-both installed, the corresponding source activates automatically — respecting
-that storage system's own access/security rules.
+Without any of these the mod still works for vanilla containers; with any
+installed, the corresponding source activates automatically — respecting that
+storage system's own access rules.
+
+Autocrafting works with all three storage systems. Missing-but-craftable
+ingredients turn the recipe slots green, and the pull button opens the storage
+system's native "how many to craft?" popup for each one — AE2's and Refined
+Storage's amount dialogs, or the Integrated Terminals crafting screen (which
+needs **Integrated Crafting** installed to have anything to craft).
 
 ## Install
 
@@ -95,6 +104,9 @@ Drop the jar into your `mods/` folder alongside:
   recommended (needed for the recipe button and viewer-list pulling)
 - **AE2** (≥ 19) — optional, enables the ME-network source
 - **Refined Storage 2** (≥ 2.0) — optional, enables the RS-grid source
+- **Integrated Terminals** (≥ 1.7) — optional, enables pulling from an
+  Integrated Dynamics network's storage terminal (add **Integrated Crafting**
+  for autocrafting too)
 
 ## Configuring
 

@@ -61,8 +61,9 @@ The mod was structured as a subproject to leave room for additional loaders
 - `jei/`, `emi/`, `rei/` — one package per recipe viewer integration
 - `network/` — the `CustomPacketPayload` records exchanged client↔server
 - `server/` — pull/availability/autocraft request handlers
-- `source/` — the `ItemSource` abstraction; `compat/ae2/` and `compat/rs/`
-  provide the AE2 and Refined Storage sources
+- `source/` — the `ItemSource` abstraction; `compat/ae2/`, `compat/rs/`, and
+  `compat/id/` provide the AE2, Refined Storage, and Integrated Dynamics sources
+  (the ID source's autocraft is a soft-add behind Integrated Crafting)
 
 ## How it works
 

@@ -139,6 +139,10 @@ public final class AutocraftChainController {
         return name.contains("craftamount")
                 || name.contains("craftconfirm")
                 || name.contains("autocrafting")
-                || name.contains("crafterror"); // AE2 CraftErrorScreen — still part of the flow
+                || name.contains("crafterror") // AE2 CraftErrorScreen — still part of the flow
+                // Integrated Terminals' amount + plan screens
+                // (ContainerScreenTerminalStorageCraftingOptionAmount / ...CraftingPlan).
+                || name.contains("craftingoption")
+                || name.contains("craftingplan");
     }
 }
