@@ -163,7 +163,9 @@ JackItToMe/                          (repo root, holds shared config)
         │   │   └── JackPullButtonController.java    IIconButtonController: button + shortage overlays
         │   └── compat/
         │       ├── ae2/Ae2ItemSource.java       AE2 MEStorage extraction (guarded by ModList)
-        │       └── rs/RsItemSource.java         RS 2.x Grid storage extraction
+        │       ├── rs/RsItemSource.java         RS 2.x Grid storage extraction
+        │       ├── id/IntegratedDynamicsItemSource.java  ID network via Integrated Terminals (+ native craft popup)
+        │       └── id/IdCraftingSupport.java             Integrated Crafting refs, isolated (craftability lookup)
         └── resources/
             ├── META-INF/neoforge.mods.toml      Dep declarations; processResources expands ${...}
             ├── pack.mcmeta
@@ -222,6 +224,17 @@ pull what's in stock.
   `RsItemSource.openAutoCraftPopup` sends `OpenRsAutocraftPayload` back to
   the client; `RsAutocraftClient` calls the API. Closing returns to the
   parent screen we passed in.
+- **Integrated Dynamics** popup is the Integrated Terminals storage terminal's
+  own crafting-option amount sub-menu. It's server-opened via `player.openMenu`
+  (like AE2, not client-side like RS): `IntegratedDynamicsItemSource`
+  resolves the `ITerminalCraftingOption` producing the item from
+  `TerminalStorageTabIngredientCraftingHandlers.REGISTRY`, wraps it, builds the
+  same `CraftingOptionGuiData` the real click sends, and calls
+  `location.openContainerCraftingOptionAmount(...)`. The IT client screens
+  (`...CraftingOptionAmount` / `...CraftingPlan`) are recognized by
+  `AutocraftChainController` via the `craftingoption`/`craftingplan` substrings.
+  All autocraft code (this + the lookup below) is soft-gated behind
+  `ModList.isLoaded("integratedcrafting")`; storage works without it.
 
 **Craftability lookups (cheap, called per slot during hover):**
 
@@ -230,6 +243,10 @@ pull what's in stock.
 - **RS**: `Grid.getAutocraftableResources(): Set<PlatformResourceKey>`
   followed by `.contains(itemResource)` — O(1) hash lookup. STABLE since
   RS 2.0.0-milestone.3.0.
+- **Integrated Dynamics** (`IdCraftingSupport.isCraftable`): iterate the
+  crafting network's channels, `getRecipeIndex(channel).getRecipes(ITEMSTACK,
+  stack, ItemMatch.ITEM|DATA).hasNext()` — an index lookup, NOT a full job
+  calculation (which would be expensive). Means "a recipe exists", like AE2/RS.
 
 ### 3a.1 Chain advance detection — the subtle bit
 

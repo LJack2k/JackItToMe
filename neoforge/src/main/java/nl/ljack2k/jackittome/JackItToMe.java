@@ -2,6 +2,7 @@ package nl.ljack2k.jackittome;
 
 import nl.ljack2k.jackittome.client.ClientEvents;
 import nl.ljack2k.jackittome.compat.ae2.Ae2ItemSource;
+import nl.ljack2k.jackittome.compat.id.IntegratedDynamicsItemSource;
 import nl.ljack2k.jackittome.compat.rs.RsItemSource;
 import nl.ljack2k.jackittome.network.ModPackets;
 import nl.ljack2k.jackittome.source.ItemSourceRegistry;
@@ -42,6 +43,13 @@ public final class JackItToMe {
         if (ModList.get().isLoaded("refinedstorage")) {
             LOGGER.info("Detected Refined Storage — registering network item source.");
             RsItemSource.register();
+        }
+        // Integrated Terminals provides the storage terminal GUI our source hooks
+        // onto; Integrated Dynamics provides the network/storage API behind it.
+        // Gating on the terminals mod is enough — it hard-depends on dynamics.
+        if (ModList.get().isLoaded("integratedterminals")) {
+            LOGGER.info("Detected Integrated Terminals — registering Integrated Dynamics item source.");
+            IntegratedDynamicsItemSource.register();
         }
 
         // Client-only setup.

@@ -68,3 +68,22 @@ type = "optional"
 versionRange = "[2.0.0,)"
 ordering = "AFTER"
 side = "BOTH"
+
+# Integrated Terminals provides the storage terminal our source attaches to; it
+# hard-depends on Integrated Dynamics, so gating on this one mod is sufficient.
+[[dependencies.${mod_id}]]
+modId = "integratedterminals"
+type = "optional"
+versionRange = "[1.7.0,)"
+ordering = "AFTER"
+side = "BOTH"
+
+# Integrated Crafting adds autocrafting to ID networks. Optional soft-add: the
+# storage source works without it; when present, the J button can trigger the
+# terminal's native craft popup.
+[[dependencies.${mod_id}]]
+modId = "integratedcrafting"
+type = "optional"
+versionRange = "[1.4.0,)"
+ordering = "AFTER"
+side = "BOTH"
