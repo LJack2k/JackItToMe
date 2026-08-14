@@ -200,6 +200,14 @@ dependencies {
         runtimeOnly "curse.maven:sophisticated-core-618298:${sophisticatedcore_curse_file_id}"
     }
 
+    // ---- Tom's Simple Storage (dev-only, no compile-time integration) ----
+    // Compat verification (issue #6): its storage terminal is a virtual
+    // scrolling list, the interesting case for the vanilla fallback.
+    //   ./gradlew :neoforge:runClient -PwithTomsStorage
+    if (project.hasProperty('withTomsStorage')) {
+        runtimeOnly "curse.maven:toms-storage-378609:${tomsstorage_curse_file_id}"
+    }
+
     // ---- EMI (optional recipe viewer) ----
     compileOnly "dev.emi:emi-neoforge:${emi_version}:api"
     if (recipeViewer == 'emi') {
