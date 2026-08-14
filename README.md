@@ -16,13 +16,14 @@ Hover the cursor over **any item** in any open screen and press **G**. One of
 that item moves into your inventory, sourced from whatever container is open
 behind the cursor.
 
-Modifier keys change how much you pull:
+Three keybinds control how much you pull — each one shows up in
+**Options → Controls → JackItToMe** and can be rebound independently:
 
-| Modifier        | Effect                                  |
-| --------------- | --------------------------------------- |
-| (none)          | One item                                |
-| **Shift+G**     | One full stack (up to 64)               |
-| **Ctrl+G**      | As much as fits in your inventory       |
+| Keybind (default) | Effect                                  |
+| ----------------- | --------------------------------------- |
+| **G**             | One item                                |
+| **Shift+G**       | One full stack (up to 64)               |
+| **Ctrl+G**        | As much as fits in your inventory       |
 
 Ctrl beats Shift if you hold both.
 
@@ -110,9 +111,14 @@ Drop the jar into your `mods/` folder alongside:
 
 ## Configuring
 
-Rebind the keybind from **Options → Controls → JackItToMe → Jack hovered
-item**. Default is **G** (changed from **P** in 0.7.0 — new installs only;
-an existing rebind is kept). No other configuration needed.
+Rebind the three pull keybinds from **Options → Controls → JackItToMe**:
+*Jack hovered item* (G), *Jack a full stack* (Shift+G), *Jack as much as
+fits* (Ctrl+G). Defaults changed from **P** in 0.7.0 — new installs only;
+an existing rebind is kept. No other configuration needed.
+
+Heads-up for AE2 users: AE2's guide (GuideMe) uses **hold-G** to open the
+guide for the hovered item. A tap pulls, a hold opens the guide, so the two
+coexist — rebind either one if the overlap bothers you.
 
 ## Links
 

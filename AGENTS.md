@@ -60,14 +60,19 @@ per session.
 
 ### Keybind path
 
-`KeyBindings` registers the keybind on the mod event bus.
-`ClientEvents.onScreenKey` intercepts every `ScreenEvent.KeyPressed.Pre`,
-compares the key to the binding, builds an `Ingredient` from what the cursor
-points at — first trying `JeiRecipeSlotProbe.getAllItemsUnderMouse` for
-multi-variant recipe slots, falling back to `AbstractContainerScreen#getSlotUnderMouse`
+`KeyBindings` registers three keybinds on the mod event bus — one per
+`PullMode` (SINGLE / STACK / MAX), defaulting to G / Shift+G / Ctrl+G via
+NeoForge `KeyModifier`s so each is independently rebindable and the Controls
+screen documents them. `ClientEvents.onScreenKey` intercepts every
+`ScreenEvent.KeyPressed.Pre`, matches via `isActiveAndMatches` most-specific
+first (MAX, then STACK, then SINGLE — NONE-modifier binds also match with a
+modifier held), builds an `Ingredient` from what the cursor points at — first
+trying `JeiRecipeSlotProbe.getAllItemsUnderMouse` for multi-variant recipe
+slots, falling back to `AbstractContainerScreen#getSlotUnderMouse`
 (vanilla containers) or JEI's `IIngredientListOverlay` /
-`IBookmarkOverlay#getIngredientUnderMouse` (sidebars). Modifier keys decide
-`PullMode` (Ctrl → MAX, Shift → STACK, else SINGLE). Sends a
+`IBookmarkOverlay#getIngredientUnderMouse` (sidebars). Hovered stacks are
+normalized to count 1 before wrapping (the ingredient's embedded count is the
+server's per-slot request — a hovered 64-stack must not request 64). Sends a
 `PullIngredientsPayload(List<Ingredient>, PullMode)` to the server.
 
 ### Recipe-button path
@@ -288,8 +293,9 @@ or `IngredientResolver`.
 
 **`PullMode`** — input/policy. New quantity modes go here; the mode flows
 through the packet unchanged, only the `switch` in `PullHandler.handle`
-interprets it. `ClientEvents` wires `Screen.hasShiftDown()` / `hasControlDown()`
-to STACK / MAX.
+interprets it. Each mode has its own `KeyMapping` in `KeyBindings`
+(defaults G / Shift+G / Ctrl+G); `ClientEvents.onScreenKey` maps binding →
+mode, most-specific first.
 
 **`JackPullButtonController.drawExtras`** — anything that needs to render
 per-recipe and work for all recipe types belongs here, not in a decorator.
@@ -428,10 +434,12 @@ JEI, AE2, RS, guideme are pulled via CurseMaven at runtime.
 1. New creative world, place a chest, put 8 oak planks in it.
 2. Open the chest.
 3. Hover an item — in the chest, in your inventory, or in JEI's sidebar.
-4. Press G. One item moves chest → inventory.
+4. Press G. One item moves chest → inventory (exactly one, even from a
+   full stack — the hovered-stack count must not leak into the request).
 5. Try Shift+G (one stack), Ctrl+G (as much as fits).
-6. Confirm each item tooltip in the open screen shows the dark-gray
-   "G to jack it to you · Shift = stack · Ctrl = max" hint line.
+6. Open Options → Controls, confirm the JackItToMe category lists three
+   binds: Jack hovered item (G), Jack a full stack (Shift+G), Jack as
+   much as fits (Ctrl+G).
 
 **Recipe-button path (vanilla container, no autocraft available):**
 1. Stand at the chest with 7 oak planks in it (one short of a chest recipe).
