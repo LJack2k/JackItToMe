@@ -17,7 +17,9 @@ import org.lwjgl.glfw.GLFW;
  * <p>
  * The "jack hovered" keybind is bound to {@code GUI} conflict context — it only
  * fires while a screen is open, so it never collides with vanilla overworld
- * bindings like P (which has no default vanilla mapping anyway, but better safe).
+ * bindings. Default is G: unbound in vanilla, and close enough to Shift/Ctrl
+ * that the quantity modifiers work one-handed (the original default P was a
+ * far-right stretch and collides with vanilla's Social Interactions key).
  */
 @EventBusSubscriber(modid = nl.ljack2k.jackittome.JackItToMe.MODID,
                     value = Dist.CLIENT,
@@ -32,7 +34,7 @@ public final class KeyBindings {
             "key.jackittome.jack_hovered",
             KeyConflictContext.GUI,
             InputConstants.Type.KEYSYM,
-            GLFW.GLFW_KEY_P,
+            GLFW.GLFW_KEY_G,
             CATEGORY
     );
 

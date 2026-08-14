@@ -12,7 +12,7 @@ will otherwise have to answer by spelunking through source.
 A NeoForge 1.21.x mod that pulls items from a player's currently-open
 inventory/storage into the player's own inventory. Two complementary UIs:
 
-**Keybind** (default <kbd>P</kbd>): hover any item anywhere in the open
+**Keybind** (default <kbd>G</kbd>; was <kbd>P</kbd> before 0.7.0): hover any item anywhere in the open
 screen, press the key, one of that item moves into the player's inventory.
 Modifier keys change quantity — Shift = a full stack, Ctrl = as much as
 will fit. If the hovered item isn't in stock but the open AE2/RS network
@@ -152,7 +152,7 @@ JackItToMe/                          (repo root, holds shared config)
         │   │   └── ContainerItemSource.java     Vanilla AbstractContainerMenu walker (fallback)
         │   ├── client/
         │   │   ├── KeyBindings.java             Mod-bus keybind registration
-        │   │   ├── ClientEvents.java            P-key handler, hover lookup, packet send
+        │   │   ├── ClientEvents.java            Pull-key handler, tooltip hint, hover lookup, packet send
         │   │   ├── ClientFeedback.java          Dispatches animation from feedback packet
         │   │   ├── JackAnimations.java          Falling-into-hotbar + red-shake-fade visuals
         │   │   ├── AvailabilityCache.java       Recipe→shortages cache, nonce-matched
@@ -191,7 +191,7 @@ Both lists are sent in `AvailabilityResponsePayload`. `JackPullButtonController.
 drawShortageOverlays` paints red (`0x80FF4040`) for non-craftable shortages
 and green (`0x8040FF40`) for craftable ones.
 
-**P keybind on a missing-but-craftable item**: `PullHandler` notices the
+**Pull keybind on a missing-but-craftable item**: `PullHandler` notices the
 single-ingredient pull moved nothing AND the source reports it craftable. It
 calls `source.openAutoCraftPopup(stack, amount, player)` instead of shipping
 a failure feedback packet — so no red shake animation, the native popup
@@ -428,8 +428,10 @@ JEI, AE2, RS, guideme are pulled via CurseMaven at runtime.
 1. New creative world, place a chest, put 8 oak planks in it.
 2. Open the chest.
 3. Hover an item — in the chest, in your inventory, or in JEI's sidebar.
-4. Press P. One item moves chest → inventory.
-5. Try Shift+P (one stack), Ctrl+P (as much as fits).
+4. Press G. One item moves chest → inventory.
+5. Try Shift+G (one stack), Ctrl+G (as much as fits).
+6. Confirm each item tooltip in the open screen shows the dark-gray
+   "G to jack it to you · Shift = stack · Ctrl = max" hint line.
 
 **Recipe-button path (vanilla container, no autocraft available):**
 1. Stand at the chest with 7 oak planks in it (one short of a chest recipe).

@@ -9,9 +9,11 @@ import nl.ljack2k.jackittome.network.PullMode;
 
 import com.mojang.blaze3d.platform.Window;
 
+import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
+import net.minecraft.network.chat.Component;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.Ingredient;
@@ -19,6 +21,7 @@ import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.ModList;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.event.ScreenEvent;
+import net.neoforged.neoforge.event.entity.player.ItemTooltipEvent;
 import net.neoforged.neoforge.network.PacketDistributor;
 
 import java.util.List;
@@ -32,7 +35,8 @@ import java.util.List;
  * <p>
  * The recipe-screen pull button is added by each viewer's own plugin using
  * that viewer's native widget API (JEI button factory, EMI recipe decorator,
- * REI category extension). This class only handles the P keybind.
+ * REI category extension). This class only handles the pull keybind
+ * (default G) and the tooltip hint that advertises it.
  */
 @EventBusSubscriber(modid = JackItToMe.MODID, value = net.neoforged.api.distmarker.Dist.CLIENT)
 public final class ClientEvents {
@@ -71,6 +75,29 @@ public final class ClientEvents {
 
         handleJackHovered(mc);
         event.setCanceled(true);
+    }
+
+    // ---- Tooltip hint ---------------------------------------------------
+
+    /**
+     * Appends one subtle line to item tooltips while a screen the keybind works
+     * on is open, so the pull key and its quantity modifiers are discoverable
+     * without opening the Controls screen. Uses the live binding, so rebinds
+     * show the right key. Suppressed when the keybind is unbound.
+     */
+    @SubscribeEvent
+    public static void onItemTooltip(ItemTooltipEvent event) {
+        if (KeyBindings.JACK_HOVERED.isUnbound()) return;
+
+        Screen screen = Minecraft.getInstance().screen;
+        boolean pullable = screen instanceof AbstractContainerScreen<?>
+                || (screen != null && bridge().isRecipeScreen(screen));
+        if (!pullable) return;
+
+        event.getToolTip().add(Component.translatable(
+                        "jackittome.tooltip.pull_hint",
+                        KeyBindings.JACK_HOVERED.getTranslatedKeyMessage())
+                .withStyle(ChatFormatting.DARK_GRAY, ChatFormatting.ITALIC));
     }
 
     // ---- Render ---------------------------------------------------------

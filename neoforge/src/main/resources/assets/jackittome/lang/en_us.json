@@ -7,6 +7,8 @@
     "jackittome.button.recipe_pull.shift_hint": "Hold Shift to also pull what's in stock",
     "jackittome.button.recipe_pull.shift_partial": "Hold Shift to pull what's in stock",
 
+    "jackittome.tooltip.pull_hint": "%s to jack it to you · Shift = stack · Ctrl = max",
+
     "key.categories.jackittome": "JackItToMe",
     "key.jackittome.jack_hovered": "Jack hovered item (Shift = stack, Ctrl = max)"
 }

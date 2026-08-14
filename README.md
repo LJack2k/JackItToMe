@@ -12,7 +12,7 @@ Works with **JEI**, **EMI**, or **REI** — install whichever you already use.
 
 ### 1. Hover-and-press: pull items
 
-Hover the cursor over **any item** in any open screen and press **P**. One of
+Hover the cursor over **any item** in any open screen and press **G**. One of
 that item moves into your inventory, sourced from whatever container is open
 behind the cursor.
 
@@ -21,14 +21,14 @@ Modifier keys change how much you pull:
 | Modifier        | Effect                                  |
 | --------------- | --------------------------------------- |
 | (none)          | One item                                |
-| **Shift+P**     | One full stack (up to 64)               |
-| **Ctrl+P**      | As much as fits in your inventory       |
+| **Shift+G**     | One full stack (up to 64)               |
+| **Ctrl+G**      | As much as fits in your inventory       |
 
 Ctrl beats Shift if you hold both.
 
 **Autocraft escalation:** if the hovered item isn't in stock but your open
 storage network can craft it (AE2, Refined Storage, or Integrated Dynamics),
-pressing P opens that system's native autocraft popup pre-filled with the
+pressing G opens that system's native autocraft popup pre-filled with the
 amount your modifier asked for (1 / 64 / a lot).
 
 Works on:
@@ -71,7 +71,7 @@ Install any **one** of these (or none). The mod adapts to whichever it finds:
 | **REI** | ✅ | ✅ | ✅ |
 | **EMI** | ✅ | ✅ | — (counts shown in the tooltip instead) |
 
-Without any viewer installed the mod still works for the **P** keybind on
+Without any viewer installed the mod still works for the **G** keybind on
 vanilla container slots — you just won't get the recipe button or the ability
 to pull from a viewer's item list.
 
@@ -111,7 +111,8 @@ Drop the jar into your `mods/` folder alongside:
 ## Configuring
 
 Rebind the keybind from **Options → Controls → JackItToMe → Jack hovered
-item**. Default is **P**. No other configuration needed.
+item**. Default is **G** (changed from **P** in 0.7.0 — new installs only;
+an existing rebind is kept). No other configuration needed.
 
 ## Links
 
