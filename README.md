@@ -50,6 +50,9 @@ Hover it to preview the state of each slot, then click to act on the recipe.
   - **Red** = missing, and no connected storage system can produce it.
   - **Green** = missing, but your network can autocraft it.
   - **Clear** = in stock.
+  - The tooltip also shows **"Current stock can make: N"** — how many of
+    the result your stock covers right now (autocraft potential not
+    counted).
 - **Click** the button:
   - If every ingredient is in stock: pulls them all (at recipe amounts)
     into your inventory.
