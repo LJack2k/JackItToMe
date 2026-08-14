@@ -4,6 +4,7 @@ import nl.ljack2k.jackittome.JackItToMe;
 import nl.ljack2k.jackittome.network.AutocraftChainPayload;
 import nl.ljack2k.jackittome.network.JackFeedbackPayload;
 import nl.ljack2k.jackittome.network.PullIngredientsPayload;
+import nl.ljack2k.jackittome.network.PullMode;
 import nl.ljack2k.jackittome.source.ItemSource;
 import nl.ljack2k.jackittome.source.ItemSourceRegistry;
 import net.minecraft.server.level.ServerPlayer;
@@ -41,78 +42,21 @@ public final class PullHandler {
         }
 
         Inventory inv = player.getInventory();
-        int totalRequested = 0;
-        int totalShortfall = 0;
-
-        // Per-slot plan staged during simulation; the extract step (below)
-        // consumes it only if effectivePull is true. Keeps the simulation
-        // and execution cleanly separated so the "should we actually pull?"
-        // decision can be made AFTER we've seen every slot's shortfall.
-        List<SlotPlan> plans = new ArrayList<>();
-        List<ItemStack> chainCandidates = new ArrayList<>();
-
-        // Local "what's left in the source" snapshot, keyed by Item. Seeded
-        // lazily from source.count(...) the first time we encounter each
-        // variant, then decremented per-slot as we allocate it. Same idea as
-        // AvailabilityHandler.simulate — we need it here so that multiple
-        // recipe slots wanting the same item (e.g. two planks slots) produce
-        // correct shortfalls. Without it, every slot would see the same
-        // "5 available" count and neither would flag a shortage even when
-        // the network only has enough for one slot.
-        Map<Item, Long> stockSnapshot = new HashMap<>();
 
         // ---- Phase 1: simulate. Don't touch the source yet. ----
-        for (Ingredient ingredient : payload.ingredients()) {
-            if (ingredient.isEmpty()) continue;
-
-            int recipeCount = firstCount(ingredient);
-            int desired = switch (payload.mode()) {
-                case SINGLE -> recipeCount;
-                case STACK  -> 64;
-                case MAX    -> MAX_PER_CLICK;
-            };
-            totalRequested += desired;
-
-            // Pick the most abundant *remaining* variant according to the
-            // snapshot. This switches automatically as variants run out.
-            ItemStack best = ItemStack.EMPTY;
-            long bestRemaining = 0;
-            for (ItemStack acceptable : ingredient.getItems()) {
-                if (acceptable.isEmpty()) continue;
-                Item item = acceptable.getItem();
-                long remaining = stockSnapshot.computeIfAbsent(item,
-                        k -> source.count(acceptable, player));
-                if (remaining > bestRemaining) {
-                    bestRemaining = remaining;
-                    best = acceptable;
-                }
-            }
-
-            int available = (int) Math.min(bestRemaining, Integer.MAX_VALUE);
-            int pullable = Math.min(desired, available);
-            int shortfall = desired - pullable;
-            totalShortfall += shortfall;
-
-            // Decrement the snapshot for subsequent slots. Done regardless
-            // of whether we ultimately extract — the simulation is authoritative.
-            if (!best.isEmpty() && pullable > 0) {
-                stockSnapshot.put(best.getItem(), bestRemaining - pullable);
-                plans.add(new SlotPlan(best, pullable));
-            }
-
-            // Autocraft pass — queue ONLY the shortfall (what the network
-            // is short by), not the full recipe count.
-            if (payload.triggerAutocraft() && shortfall > 0) {
-                ItemStack candidate = firstCraftableVariant(ingredient, source, player, shortfall);
-                if (!candidate.isEmpty()) {
-                    chainCandidates.add(candidate);
-                }
-            }
-        }
+        // SINGLE asks for the recipe's own amounts per slot (partial pulls
+        // allowed); STACK/MAX ask for whole extra crafts, keeping the
+        // recipe's ingredient ratios (see simulateBulk).
+        Simulation sim = payload.mode() == PullMode.SINGLE
+                ? simulateSingle(source, payload, player)
+                : simulateBulk(source, payload, player);
+        int totalRequested = sim.totalRequested();
+        int totalShortfall = sim.totalShortfall();
+        List<SlotPlan> plans = sim.plans();
 
         // Aggregate by item identity: collapse duplicate entries from
         // different recipe slots into a single popup with the summed count.
-        chainCandidates = aggregateByItem(chainCandidates);
+        List<ItemStack> chainCandidates = aggregateByItem(sim.chainCandidates());
 
         // ---- Phase 2: decide whether the pull actually executes. ----
         //   - Shift+click (pullAvailable=true): always extract what's in stock.
@@ -232,6 +176,198 @@ public final class PullHandler {
         if (player.containerMenu != player.inventoryMenu) {
             player.containerMenu.broadcastChanges();
         }
+    }
+
+    /** What Phase 1 produced, however the mode computed it. */
+    private record Simulation(List<SlotPlan> plans,
+                              List<ItemStack> chainCandidates,
+                              int totalRequested,
+                              int totalShortfall) {}
+
+    /**
+     * SINGLE-mode simulation: each slot independently wants its recipe count.
+     * Partial fulfillment is fine — 6 of 8 planks pulls 6 and shortfalls 2.
+     */
+    private static Simulation simulateSingle(ItemSource source, PullIngredientsPayload payload, ServerPlayer player) {
+        List<SlotPlan> plans = new ArrayList<>();
+        List<ItemStack> chainCandidates = new ArrayList<>();
+        int totalRequested = 0;
+        int totalShortfall = 0;
+
+        // Local "what's left in the source" snapshot, keyed by Item. Seeded
+        // lazily from source.count(...) the first time we encounter each
+        // variant, then decremented per-slot as we allocate it. Same idea as
+        // AvailabilityHandler.simulate — we need it here so that multiple
+        // recipe slots wanting the same item (e.g. two planks slots) produce
+        // correct shortfalls. Without it, every slot would see the same
+        // "5 available" count and neither would flag a shortage even when
+        // the network only has enough for one slot.
+        Map<Item, Long> stockSnapshot = new HashMap<>();
+
+        for (Ingredient ingredient : payload.ingredients()) {
+            if (ingredient.isEmpty()) continue;
+
+            int desired = firstCount(ingredient);
+            totalRequested += desired;
+
+            // Pick the most abundant *remaining* variant according to the
+            // snapshot. This switches automatically as variants run out.
+            ItemStack best = ItemStack.EMPTY;
+            long bestRemaining = 0;
+            for (ItemStack acceptable : ingredient.getItems()) {
+                if (acceptable.isEmpty()) continue;
+                Item item = acceptable.getItem();
+                long remaining = stockSnapshot.computeIfAbsent(item,
+                        k -> source.count(acceptable, player));
+                if (remaining > bestRemaining) {
+                    bestRemaining = remaining;
+                    best = acceptable;
+                }
+            }
+
+            int available = (int) Math.min(bestRemaining, Integer.MAX_VALUE);
+            int pullable = Math.min(desired, available);
+            int shortfall = desired - pullable;
+            totalShortfall += shortfall;
+
+            // Decrement the snapshot for subsequent slots. Done regardless
+            // of whether we ultimately extract — the simulation is authoritative.
+            if (!best.isEmpty() && pullable > 0) {
+                stockSnapshot.put(best.getItem(), bestRemaining - pullable);
+                plans.add(new SlotPlan(best, pullable));
+            }
+
+            // Autocraft pass — queue ONLY the shortfall (what the network
+            // is short by), not the full recipe count.
+            if (payload.triggerAutocraft() && shortfall > 0) {
+                ItemStack candidate = firstCraftableVariant(ingredient, source, player, shortfall);
+                if (!candidate.isEmpty()) {
+                    chainCandidates.add(candidate);
+                }
+            }
+        }
+        return new Simulation(plans, chainCandidates, totalRequested, totalShortfall);
+    }
+
+    /**
+     * STACK/MAX simulation: think in whole crafts, not per-slot stacks, so the
+     * recipe's ingredient ratios are preserved. A book (3 paper + 1 leather)
+     * with 64 paper and 3 leather in stock pulls 9 paper + 3 leather — three
+     * complete crafts, limited by the scarcest ingredient — never 64 of each.
+     * <p>
+     * The craft multiplier is computed in three steps:
+     * <ol>
+     *   <li><b>mode cap</b> — STACK targets materials for one full stack of
+     *       the OUTPUT: {@code ceil(64 / resultsPerCraft)} crafts. MAX targets
+     *       as many crafts as {@link #MAX_PER_CLICK} per ingredient allows
+     *       (which also sanity-caps STACK).</li>
+     *   <li><b>target m*</b> — the mode cap further limited by every
+     *       NON-craftable ingredient's stock. Craftable ingredients don't
+     *       limit the target: their gap toward it becomes the autocraft
+     *       popup's pre-fill amount.</li>
+     *   <li><b>pulled m</b> — {@code min(m*, what stock supports for every
+     *       ingredient)} complete crafts are extracted now.</li>
+     * </ol>
+     */
+    private static Simulation simulateBulk(ItemSource source, PullIngredientsPayload payload, ServerPlayer player) {
+        // Resolve each slot to its most abundant variant, then total up the
+        // per-craft need and available stock per resolved item.
+        Map<Item, Long> stock = new HashMap<>();
+        java.util.LinkedHashMap<Item, Integer> perCraft = new java.util.LinkedHashMap<>();
+        Map<Item, ItemStack> template = new HashMap<>();
+
+        for (Ingredient ingredient : payload.ingredients()) {
+            if (ingredient.isEmpty()) continue;
+
+            ItemStack best = ItemStack.EMPTY;
+            long bestAvailable = -1;
+            for (ItemStack acceptable : ingredient.getItems()) {
+                if (acceptable.isEmpty()) continue;
+                long available = stock.computeIfAbsent(acceptable.getItem(),
+                        k -> source.count(acceptable, player));
+                if (available > bestAvailable) {
+                    bestAvailable = available;
+                    best = acceptable;
+                }
+            }
+            if (best.isEmpty()) continue;
+
+            perCraft.merge(best.getItem(), Math.max(1, best.getCount()), Integer::sum);
+            template.putIfAbsent(best.getItem(), best.copyWithCount(1));
+        }
+        if (perCraft.isEmpty()) {
+            return new Simulation(List.of(), List.of(), 0, 0);
+        }
+
+        // Step 1: the mode cap, in whole crafts.
+        //   STACK — enough crafts for one full stack of the OUTPUT item:
+        //           ceil(64 / resultsPerCraft). A book (1 result/craft) wants
+        //           64 crafts = 192 paper + 64 leather; ingredients may well
+        //           exceed a stack each — that's the point.
+        //   MAX   — as many crafts as MAX_PER_CLICK per ingredient allows.
+        // Both are additionally sanity-capped per ingredient at MAX_PER_CLICK,
+        // and max(1, ...) so a recipe slot wanting more than the cap per craft
+        // still pulls at least one craft's worth.
+        long sanityCap = Long.MAX_VALUE;
+        long stockCrafts = Long.MAX_VALUE;
+        for (Map.Entry<Item, Integer> e : perCraft.entrySet()) {
+            sanityCap = Math.min(sanityCap, (long) MAX_PER_CLICK / e.getValue());
+            stockCrafts = Math.min(stockCrafts, stock.get(e.getKey()) / e.getValue());
+        }
+        long modeCap = payload.mode() == PullMode.STACK
+                ? Math.ceilDiv(64, Math.max(1, payload.resultsPerCraft()))
+                : sanityCap;
+        modeCap = Math.max(1, Math.min(modeCap, sanityCap));
+
+        // Step 2: the target — craftable ingredients don't limit it, their
+        // gap becomes the popup pre-fill. Without autocraft the target is
+        // just what stock supports.
+        long target = modeCap;
+        if (payload.triggerAutocraft()) {
+            for (Map.Entry<Item, Integer> e : perCraft.entrySet()) {
+                if (!source.isAutocraftable(template.get(e.getKey()), player)) {
+                    target = Math.min(target, stock.get(e.getKey()) / e.getValue());
+                }
+            }
+        } else {
+            target = Math.min(target, stockCrafts);
+        }
+
+        // Step 3: pull whole crafts only, never partial ratios — unless the
+        // player held the override (fillPartial): then each ingredient fills
+        // toward the target independently, so a missing ingredient doesn't
+        // zero out the rest ("grab what you can, I'll sort out the gap").
+        long pulled = Math.min(target, stockCrafts);
+
+        List<SlotPlan> plans = new ArrayList<>();
+        List<ItemStack> chainCandidates = new ArrayList<>();
+        int totalRequested = 0;
+        int totalShortfall = 0;
+        for (Map.Entry<Item, Integer> e : perCraft.entrySet()) {
+            long want = target * e.getValue();
+            // Requested reflects the mode's ASK (the cap), not the stock-clamped
+            // target — so a bulk click that can't complete a single craft still
+            // counts as "asked for something" and the no-op gets the red-shake
+            // failure feedback instead of feeling like a dead click.
+            totalRequested += (int) Math.min(modeCap * e.getValue(), Integer.MAX_VALUE - totalRequested);
+
+            long pull = payload.fillPartial()
+                    ? Math.min(modeCap * e.getValue(), stock.get(e.getKey()))
+                    : pulled * e.getValue();
+            if (pull > 0) {
+                plans.add(new SlotPlan(template.get(e.getKey()), (int) Math.min(pull, Integer.MAX_VALUE)));
+            }
+
+            long gap = want - Math.min(stock.get(e.getKey()), want);
+            if (gap > 0) {
+                totalShortfall += (int) Math.min(gap, Integer.MAX_VALUE - totalShortfall);
+                if (payload.triggerAutocraft() && source.isAutocraftable(template.get(e.getKey()), player)) {
+                    chainCandidates.add(template.get(e.getKey())
+                            .copyWithCount((int) Math.min(gap, Integer.MAX_VALUE)));
+                }
+            }
+        }
+        return new Simulation(plans, chainCandidates, totalRequested, totalShortfall);
     }
 
     /**

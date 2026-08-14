@@ -120,7 +120,8 @@ public final class ClientEvents {
         JackItToMe.LOGGER.info("[JackItToMe] Jack key pressed — mode={}", mode);
 
         PacketDistributor.sendToServer(new PullIngredientsPayload(
-                List.of(ing), mode, /*pullAvailable=*/ true, /*triggerAutocraft=*/ true));
+                List.of(ing), mode, /*resultsPerCraft=*/ 1,
+                /*pullAvailable=*/ true, /*fillPartial=*/ false, /*triggerAutocraft=*/ true));
     }
 
     private static Ingredient tryRecipeSlotIngredient(Minecraft mc) {

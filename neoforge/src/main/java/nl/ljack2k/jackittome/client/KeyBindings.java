@@ -63,10 +63,26 @@ public final class KeyBindings {
             CATEGORY
     );
 
+    /**
+     * Hold-modifier for the recipe pull button: held during a plain click it
+     * bypasses the review-first gate — in-stock ingredients pull at recipe
+     * amounts while autocraft popups still open for the missing ones. Not a
+     * press-action bind; {@code PullButtonClick} samples its key state at
+     * click time (keyboard binds only).
+     */
+    public static final KeyMapping PULL_OVERRIDE = new KeyMapping(
+            "key.jackittome.pull_override",
+            KeyConflictContext.GUI,
+            InputConstants.Type.KEYSYM,
+            GLFW.GLFW_KEY_LEFT_ALT,
+            CATEGORY
+    );
+
     @SubscribeEvent
     public static void register(RegisterKeyMappingsEvent event) {
         event.register(JACK_HOVERED);
         event.register(JACK_STACK);
         event.register(JACK_MAX);
+        event.register(PULL_OVERRIDE);
     }
 }

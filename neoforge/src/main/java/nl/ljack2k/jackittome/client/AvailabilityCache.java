@@ -30,6 +30,9 @@ public final class AvailabilityCache {
     /** Latest craftable data; same length as {@link #latestShortages} when present. */
     private static List<Boolean> latestCraftable = null;
 
+    /** Latest whole-crafts-from-stock count, or null before the response lands. */
+    private static Integer latestCrafts = null;
+
     /**
      * Mark this recipe as the currently-hovered one and allocate a fresh nonce.
      * Returns the nonce so the caller can include it in the outgoing request.
@@ -48,6 +51,7 @@ public final class AvailabilityCache {
             // Moving to a different recipe — old shortages are wrong, clear them.
             latestShortages = null;
             latestCraftable = null;
+            latestCrafts = null;
         }
         hoveredRecipe = recipe;
         currentNonce = NEXT_NONCE.getAndIncrement();
@@ -60,6 +64,7 @@ public final class AvailabilityCache {
             hoveredRecipe = null;
             latestShortages = null;
             latestCraftable = null;
+            latestCrafts = null;
         }
     }
 
@@ -76,6 +81,7 @@ public final class AvailabilityCache {
         hoveredRecipe = null;
         latestShortages = null;
         latestCraftable = null;
+        latestCrafts = null;
     }
 
     /**
@@ -83,10 +89,11 @@ public final class AvailabilityCache {
      * the current hover — i.e. the user moved to a different recipe before
      * the response landed.
      */
-    public static synchronized void receive(long nonce, List<Boolean> shortages, List<Boolean> craftable) {
+    public static synchronized void receive(long nonce, List<Boolean> shortages, List<Boolean> craftable, int craftsPossible) {
         if (nonce == currentNonce && hoveredRecipe != null) {
             latestShortages = shortages;
             latestCraftable = craftable;
+            latestCrafts = craftsPossible;
         }
     }
 
@@ -107,6 +114,15 @@ public final class AvailabilityCache {
      */
     public static synchronized List<Boolean> craftableFor(Object recipe) {
         if (recipe != null && recipe == hoveredRecipe) return latestCraftable;
+        return null;
+    }
+
+    /**
+     * Whole crafts current stock supports for the given recipe, or null if
+     * this recipe isn't currently hovered or the response hasn't arrived yet.
+     */
+    public static synchronized Integer craftsFor(Object recipe) {
+        if (recipe != null && recipe == hoveredRecipe) return latestCrafts;
         return null;
     }
 }

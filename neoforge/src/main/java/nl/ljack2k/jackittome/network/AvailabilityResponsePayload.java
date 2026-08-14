@@ -30,13 +30,17 @@ import java.util.List;
  * only when {@code shortages[i]} is true — if the ingredient was fulfilled
  * from stock, we don't bother checking craftability.
  * <p>
+ * {@code craftsPossible} is how many whole crafts current stock supports
+ * (recipe ratios respected) — the tooltip's "Can make: N" line.
+ * <p>
  * The {@code nonce} is echoed from the request so the client can match this
  * response to the correct hover; if a newer request has since fired, this
  * response is silently dropped.
  */
 public record AvailabilityResponsePayload(long nonce,
                                           List<Boolean> shortages,
-                                          List<Boolean> craftable) implements CustomPacketPayload {
+                                          List<Boolean> craftable,
+                                          int craftsPossible) implements CustomPacketPayload {
 
     public static final Type<AvailabilityResponsePayload> TYPE =
             new Type<>(ResourceLocation.fromNamespaceAndPath(JackItToMe.MODID, "availability_response"));
@@ -45,6 +49,7 @@ public record AvailabilityResponsePayload(long nonce,
             ByteBufCodecs.VAR_LONG,                          AvailabilityResponsePayload::nonce,
             ByteBufCodecs.BOOL.apply(ByteBufCodecs.list()),  AvailabilityResponsePayload::shortages,
             ByteBufCodecs.BOOL.apply(ByteBufCodecs.list()),  AvailabilityResponsePayload::craftable,
+            ByteBufCodecs.VAR_INT,                           AvailabilityResponsePayload::craftsPossible,
             AvailabilityResponsePayload::new
     );
 
@@ -54,6 +59,6 @@ public record AvailabilityResponsePayload(long nonce,
     }
 
     public void handle(IPayloadContext ctx) {
-        ctx.enqueueWork(() -> AvailabilityCache.receive(nonce, shortages, craftable));
+        ctx.enqueueWork(() -> AvailabilityCache.receive(nonce, shortages, craftable, craftsPossible));
     }
 }

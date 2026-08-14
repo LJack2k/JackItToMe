@@ -34,7 +34,7 @@ public final class AvailabilityHandler {
     public static void handle(ServerPlayer player, CheckAvailabilityPayload req) {
         Result r = simulate(player, req.ingredients());
         PacketDistributor.sendToPlayer(player,
-                new AvailabilityResponsePayload(req.nonce(), r.shortages, r.craftable));
+                new AvailabilityResponsePayload(req.nonce(), r.shortages, r.craftable, r.craftsPossible));
     }
 
     /**
@@ -53,7 +53,7 @@ public final class AvailabilityHandler {
                 shortages.add(Boolean.TRUE);
                 craftable.add(Boolean.FALSE);
             }
-            return new Result(shortages, craftable);
+            return new Result(shortages, craftable, 0);
         }
 
         // Sample what's available once, then track decrements locally.
@@ -105,9 +105,49 @@ public final class AvailabilityHandler {
                 craftable.add(Boolean.FALSE);
             }
         }
-        return new Result(shortages, craftable);
+        return new Result(shortages, craftable, craftsPossible(source, player, ingredients));
     }
 
-    /** Bundle of parallel arrays — same length, indexed by ingredient slot. */
-    public record Result(List<Boolean> shortages, List<Boolean> craftable) {}
+    /**
+     * How many whole crafts current stock supports — the same craft-multiplier
+     * view {@code PullHandler.simulateBulk} uses for STACK/MAX pulls: resolve
+     * each slot to its most abundant variant, total the per-craft need per
+     * item, then take {@code min over items of floor(stock / perCraft)}.
+     * Feeds the button tooltip's "Can make: N" line (the client multiplies by
+     * the recipe's results-per-craft for display).
+     */
+    private static int craftsPossible(ItemSource source, ServerPlayer player, List<Ingredient> ingredients) {
+        Map<Item, Long> stock = new HashMap<>();
+        Map<Item, Integer> perCraft = new HashMap<>();
+
+        for (Ingredient ing : ingredients) {
+            if (ing.isEmpty()) continue;
+            ItemStack best = ItemStack.EMPTY;
+            long bestAvailable = -1;
+            for (ItemStack acceptable : ing.getItems()) {
+                if (acceptable.isEmpty()) continue;
+                long available = stock.computeIfAbsent(acceptable.getItem(),
+                        k -> source.count(acceptable, player));
+                if (available > bestAvailable) {
+                    bestAvailable = available;
+                    best = acceptable;
+                }
+            }
+            if (best.isEmpty()) continue;
+            perCraft.merge(best.getItem(), Math.max(1, best.getCount()), Integer::sum);
+        }
+        if (perCraft.isEmpty()) return 0;
+
+        long crafts = Long.MAX_VALUE;
+        for (Map.Entry<Item, Integer> e : perCraft.entrySet()) {
+            crafts = Math.min(crafts, stock.get(e.getKey()) / e.getValue());
+        }
+        return (int) Math.min(crafts, Integer.MAX_VALUE);
+    }
+
+    /**
+     * Bundle of parallel arrays (same length, indexed by ingredient slot) plus
+     * the whole-crafts count current stock supports.
+     */
+    public record Result(List<Boolean> shortages, List<Boolean> craftable, int craftsPossible) {}
 }

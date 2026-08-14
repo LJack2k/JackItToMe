@@ -51,16 +51,48 @@ Hover it to preview the state of each slot, then click to act on the recipe.
   - **Green** = missing, but your network can autocraft it.
   - **Clear** = in stock.
 - **Click** the button:
-  - If every ingredient is in stock: pulls them all into your inventory.
+  - If every ingredient is in stock: pulls them all (at recipe amounts)
+    into your inventory.
   - If any ingredient is missing: triggers autocraft popups (one after the
     next) for the missing-but-craftable ones. **Does not pull anything** —
-    even in-stock items stay in storage until you Shift+click.
-- **Shift+Click**: always pulls every in-stock ingredient **and** triggers
-  autocraft popups for any missing-but-craftable ones.
+    in-stock items stay in storage so you can review the popups without
+    committing.
+- **Alt+Click**: pulls every in-stock ingredient at recipe amounts **and**
+  triggers autocraft popups for the missing-but-craftable ones. (Alt is
+  the default — it's a rebindable keybind, see Configuring.)
+- **Shift+Click**: pulls the materials for **a full stack of the output**
+  — a book prints one per craft, so Shift grabs 64 crafts' worth: 192
+  paper + 64 leather. Always whole crafts, ratios preserved: with 64
+  paper but only 3 leather in stock you get 9 paper + 3 leather (three
+  crafts' worth), never a useless pile of paper.
+- **Ctrl+Click**: as many complete crafts as your storage (and inventory
+  space) supports. Ctrl beats Shift if you hold both.
+- **Add Alt to Shift/Ctrl**: same targets, but drop the whole-crafts
+  rule — every ingredient fills toward the target from whatever stock
+  exists, even when another ingredient is completely missing. "Grab
+  what you can, I'll sort out the rest."
 
-The rule in one sentence: Shift is the "always pull" modifier; plain click
-pulls only when there's nothing to autocraft, otherwise it leaves your
-inventory alone so you can review the autocraft popups without committing.
+Missing-but-craftable ingredients never limit Shift/Ctrl — their popups
+open pre-filled with exactly the gap toward the requested amount.
+
+The modifiers mean the same thing everywhere: **Shift = a stack's worth,
+Ctrl = as much as fits** — on the hover keybind and on the recipe button
+alike. Alt is the button's "pull what's in stock anyway" override for
+when something is missing.
+
+### The full matrix
+
+| Input | Hovering an item (keybind) | On the recipe button |
+| ----- | -------------------------- | -------------------- |
+| **G** / plain click | Pull 1 of that item | Pull the recipe's amounts — but if anything is missing, only open autocraft popups (nothing pulled) |
+| **Shift** | Pull one stack of it | Pull materials for a **stack of the output** — whole crafts only |
+| **Ctrl** | Pull as much as fits | Pull as many **whole crafts** as stock allows |
+| **Alt** | — | Pull in-stock recipe amounts even though something is missing |
+| **Alt+Shift** | — | Stack-of-output target, but fill each ingredient from whatever stock exists (no whole-crafts rule) |
+| **Alt+Ctrl** | — | Same, with the "as much as fits" target |
+
+Everywhere: Ctrl beats Shift; anything missing-but-autocraftable opens
+its native craft popup pre-filled with exactly the gap.
 
 ## Recipe viewers
 
@@ -111,9 +143,10 @@ Drop the jar into your `mods/` folder alongside:
 
 ## Configuring
 
-Rebind the three pull keybinds from **Options → Controls → JackItToMe**:
+Rebind the pull keybinds from **Options → Controls → JackItToMe**:
 *Jack hovered item* (G), *Jack a full stack* (Shift+G), *Jack as much as
-fits* (Ctrl+G). Defaults changed from **P** in 0.7.0 — new installs only;
+fits* (Ctrl+G), and *Pull in-stock override* (hold Alt while clicking the
+recipe button). Defaults changed from **P** in 0.7.0 — new installs only;
 an existing rebind is kept. No other configuration needed.
 
 Heads-up for AE2 users: AE2's guide (GuideMe) uses **hold-G** to open the

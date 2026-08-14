@@ -4,11 +4,13 @@
     "jackittome.button.recipe_pull.ready": "All %s available",
     "jackittome.button.recipe_pull.missing": "%s missing",
     "jackittome.button.recipe_pull.craftable": "%s can be autocrafted",
-    "jackittome.button.recipe_pull.shift_hint": "Hold Shift to also pull what's in stock",
-    "jackittome.button.recipe_pull.shift_partial": "Hold Shift to pull what's in stock",
+    "jackittome.button.recipe_pull.can_make": "Current stock can make: %s",
+    "jackittome.button.recipe_pull.gate_hint": "Click: autocraft only · hold %s to pull in-stock",
+    "jackittome.button.recipe_pull.modifier_hint": "Shift: a stack of results · Ctrl: max",
 
     "key.categories.jackittome": "JackItToMe",
     "key.jackittome.jack_hovered": "Jack hovered item",
     "key.jackittome.jack_stack": "Jack a full stack",
-    "key.jackittome.jack_max": "Jack as much as fits"
+    "key.jackittome.jack_max": "Jack as much as fits",
+    "key.jackittome.pull_override": "Pull in-stock override (hold + click recipe button)"
 }
