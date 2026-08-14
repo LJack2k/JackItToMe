@@ -26,7 +26,12 @@ public final class ModPackets {
         //      (List<ItemStack> successItems, ItemStack failureItem) so
         //      multiple unique ingredient types each get their own
         //      staggered fan-out success animation.
-        final PayloadRegistrar registrar = event.registrar(JackItToMe.MODID).versioned("5");
+        //   6: PullIngredientsPayload gained resultsPerCraft; STACK mode is
+        //      now "materials for a stack of the OUTPUT" (whole crafts,
+        //      recipe ratios preserved) instead of a stack per slot.
+        //      AvailabilityResponsePayload gained craftsPossible (whole
+        //      crafts current stock supports — the "Can make: N" tooltip).
+        final PayloadRegistrar registrar = event.registrar(JackItToMe.MODID).versioned("6");
 
         registrar.playToServer(
                 PullIngredientsPayload.TYPE,

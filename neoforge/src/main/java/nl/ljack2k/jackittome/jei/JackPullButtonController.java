@@ -2,7 +2,6 @@ package nl.ljack2k.jackittome.jei;
 
 import nl.ljack2k.jackittome.JackItToMe;
 import nl.ljack2k.jackittome.network.PullIngredientsPayload;
-import nl.ljack2k.jackittome.network.PullMode;
 
 import mezz.jei.api.gui.IRecipeLayoutDrawable;
 import mezz.jei.api.gui.builder.ITooltipBuilder;
@@ -19,7 +18,6 @@ import nl.ljack2k.jackittome.client.AvailabilityCache;
 import nl.ljack2k.jackittome.network.CheckAvailabilityPayload;
 
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.renderer.Rect2i;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
@@ -87,28 +85,13 @@ public class JackPullButtonController implements IIconButtonController {
         // actually wanting us to fire. Confirm yes so JEI shows hover affordances.
         if (input.isSimulate()) return true;
 
-        List<Ingredient> ingredients = collectInputIngredients();
-        if (ingredients.stream().allMatch(Ingredient::isEmpty)) {
-            JackItToMe.LOGGER.debug("[JackItToMe] Recipe button clicked but recipe has no input slots.");
-            return false;
-        }
-
-        // Autocraft always fires on the J button — whether or not Shift is
-        // held. Shift is purely the "also pull what's in stock" toggle.
-        // We read Screen.hasShiftDown() rather than input.getModifiers()
-        // because JEI's IJeiUserInput.getModifiers() always returns 0 in
-        // 19.27 (see AGENTS.md §5.1.1).
-        boolean shift =
-                (input.getModifiers() & GLFW.GLFW_MOD_SHIFT) != 0
-                || Screen.hasShiftDown();
-        boolean pullAvailable = shift;
-        boolean triggerAutocraft = true;
-
-        JackItToMe.LOGGER.info("[JackItToMe] Recipe button: {} ingredients, pull={}, autocraft={}.",
-                ingredients.size(), pullAvailable, triggerAutocraft);
-        PacketDistributor.sendToServer(new PullIngredientsPayload(
-                ingredients, PullMode.SINGLE, pullAvailable, triggerAutocraft));
-        return true;
+        // Modifier → mode mapping is shared across viewers in PullButtonClick.
+        // JEI's own getModifiers() is OR'd in as future-proofing — it always
+        // returns 0 in 19.27 (see AGENTS.md §5.1.1), the live GLFW state is
+        // what actually decides.
+        boolean viewerShift = (input.getModifiers() & GLFW.GLFW_MOD_SHIFT) != 0;
+        return nl.ljack2k.jackittome.client.PullButtonClick.send(
+                "JEI", collectInputIngredients(), resultsPerCraft(), viewerShift);
     }
 
     @Override
@@ -116,7 +99,7 @@ public class JackPullButtonController implements IIconButtonController {
         // Shared builder — same text JEI/EMI/REI all show, sourced from the
         // shared AvailabilityCache (keyed on the recipe object).
         for (Component line : nl.ljack2k.jackittome.client.PullTooltipBuilder.build(
-                layoutDrawable.getRecipe(), collectInputIngredients())) {
+                layoutDrawable.getRecipe(), collectInputIngredients(), resultsPerCraft())) {
             tooltip.add(line);
         }
     }
@@ -244,5 +227,20 @@ public class JackPullButtonController implements IIconButtonController {
             }
         }
         return out;
+    }
+
+    /**
+     * How many output items one craft of this recipe produces (first output
+     * slot's stack count) — drives STACK mode's "a stack of the result"
+     * target. Falls back to 1 when the recipe has no readable output slot.
+     */
+    private int resultsPerCraft() {
+        for (IRecipeSlotView slot : layoutDrawable.getRecipeSlotsView()
+                .getSlotViews(RecipeIngredientRole.OUTPUT)) {
+            for (ItemStack stack : slot.getItemStacks().toList()) {
+                if (!stack.isEmpty()) return Math.max(1, stack.getCount());
+            }
+        }
+        return 1;
     }
 }

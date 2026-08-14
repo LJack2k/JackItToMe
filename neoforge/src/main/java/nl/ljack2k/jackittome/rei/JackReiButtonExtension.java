@@ -57,6 +57,7 @@ public final class JackReiButtonExtension<T extends Display> implements Category
                 // line up 1:1 — categories don't always order the two the same.
                 List<Rectangle> inputSlotBounds = new ArrayList<>();
                 List<Ingredient> ingredients = new ArrayList<>();
+                int resultsPerCraft = 1;
                 for (Widget w : widgets) {
                     if (w instanceof Slot slot && slot.getNoticeMark() == Slot.INPUT) {
                         inputSlotBounds.add(slot.getBounds());
@@ -67,6 +68,17 @@ public final class JackReiButtonExtension<T extends Display> implements Category
                         }
                         ingredients.add(stacks.isEmpty() ? Ingredient.EMPTY
                                 : Ingredient.of(stacks.toArray(ItemStack[]::new)));
+                    } else if (w instanceof Slot slot && slot.getNoticeMark() == Slot.OUTPUT
+                            && resultsPerCraft == 1) {
+                        // First output slot's count drives STACK mode's
+                        // "a stack of the result" target.
+                        for (EntryStack<?> entry : slot.getEntries()) {
+                            ItemStack is = ReiDisplays.toItemStack(entry);
+                            if (!is.isEmpty()) {
+                                resultsPerCraft = Math.max(1, is.getCount());
+                                break;
+                            }
+                        }
                     }
                 }
                 if (ingredients.stream().allMatch(Ingredient::isEmpty)) {
@@ -78,8 +90,9 @@ public final class JackReiButtonExtension<T extends Display> implements Category
                 Rectangle buttonBounds = new Rectangle(bx, by, 16, 16);
 
                 // The button (REI draws its native frame) fires the pull.
+                int results = resultsPerCraft;
                 widgets.add(Widgets.createButton(buttonBounds, Component.empty())
-                        .onClick(b -> ReiDisplays.sendPull(ingredients)));
+                        .onClick(b -> ReiDisplays.sendPull(ingredients, results)));
 
                 // One overlay widget, added last so it draws over the slots:
                 // renders the icon, polls availability while hovered, paints
@@ -105,7 +118,7 @@ public final class JackReiButtonExtension<T extends Display> implements Category
                     }
 
                     if (hovered) {
-                        Tooltip.create(PullTooltipBuilder.build(d, ingredients)).queue();
+                        Tooltip.create(PullTooltipBuilder.build(d, ingredients, results)).queue();
                     }
                 }));
                 return widgets;

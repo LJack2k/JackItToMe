@@ -33,13 +33,26 @@ import java.util.List;
  * @param ingredients       ingredients to operate on
  * @param mode              how much to pull (single craft / stack / max).
  *                          Irrelevant if {@code pullAvailable} is false.
+ * @param resultsPerCraft   how many output items one craft of this recipe
+ *                          produces. STACK mode targets a full stack of
+ *                          <em>results</em>: {@code ceil(64 / resultsPerCraft)}
+ *                          crafts' worth of ingredients. Send 1 when there is
+ *                          no recipe context (the hover keybind) or the count
+ *                          is unknown.
  * @param pullAvailable     pull in-stock ingredients into the player's inventory
+ * @param fillPartial       bulk modes only (the Alt override): fill each
+ *                          ingredient toward the mode's target independently,
+ *                          partial crafts allowed, instead of whole-crafts-only.
+ *                          Ignored in SINGLE mode (there the override already
+ *                          acts client-side by setting {@code pullAvailable}).
  * @param triggerAutocraft  open autocraft popups for missing-but-craftable
  *                          ingredients
  */
 public record PullIngredientsPayload(List<Ingredient> ingredients,
                                      PullMode mode,
+                                     int resultsPerCraft,
                                      boolean pullAvailable,
+                                     boolean fillPartial,
                                      boolean triggerAutocraft) implements CustomPacketPayload {
 
     public static final Type<PullIngredientsPayload> TYPE =
@@ -50,8 +63,12 @@ public record PullIngredientsPayload(List<Ingredient> ingredients,
             PullIngredientsPayload::ingredients,
             ByteBufCodecs.VAR_INT.map(PullMode::fromOrdinal, PullMode::ordinal),
             PullIngredientsPayload::mode,
+            ByteBufCodecs.VAR_INT,
+            PullIngredientsPayload::resultsPerCraft,
             ByteBufCodecs.BOOL,
             PullIngredientsPayload::pullAvailable,
+            ByteBufCodecs.BOOL,
+            PullIngredientsPayload::fillPartial,
             ByteBufCodecs.BOOL,
             PullIngredientsPayload::triggerAutocraft,
             PullIngredientsPayload::new

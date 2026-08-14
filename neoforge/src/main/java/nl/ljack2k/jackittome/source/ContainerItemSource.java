@@ -45,17 +45,25 @@ public class ContainerItemSource implements ItemSource {
         ItemStack out = ItemStack.EMPTY;
         int needed = amount;
 
+        // Diagnostic counters: which stage of the walk rejected slots. Logged
+        // at debug — turn on the jackittome debug log level to field "can't
+        // pull from mod X" reports (first used for issue #4, where they showed
+        // Sophisticated Storage slot settings do NOT block extraction).
+        int dMatched = 0, dNoPickup = 0, dRemoveEmpty = 0;
+
         for (Slot slot : menu.slots) {
             if (needed == 0) break;
             if (slot.container == playerInv) continue;
-            if (!slot.mayPickup(player)) continue;
 
             ItemStack inSlot = slot.getItem();
             if (!sameItem(template, inSlot)) continue;
+            dMatched++;
+
+            if (!slot.mayPickup(player)) { dNoPickup++; continue; }
 
             int take = Math.min(needed, inSlot.getCount());
             ItemStack taken = slot.remove(take);
-            if (taken.isEmpty()) continue;
+            if (taken.isEmpty()) { dRemoveEmpty++; continue; }
 
             if (out.isEmpty()) {
                 out = taken;
@@ -65,6 +73,11 @@ public class ContainerItemSource implements ItemSource {
             needed -= taken.getCount();
             slot.setChanged();
         }
+
+        nl.ljack2k.jackittome.JackItToMe.LOGGER.debug(
+                "[JackItToMe] container extract '{}' x{}: moved={}, slotsMatched={}, mayPickupDenied={}, removeReturnedEmpty={} (menu={})",
+                template.getHoverName().getString(), amount, out.getCount(),
+                dMatched, dNoPickup, dRemoveEmpty, menu.getClass().getName());
 
         return out;
     }

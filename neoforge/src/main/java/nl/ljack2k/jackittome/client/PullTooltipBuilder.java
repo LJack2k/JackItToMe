@@ -21,11 +21,13 @@ public final class PullTooltipBuilder {
     public static final int CRAFTABLE_COLOR = 0x8040FF40;
 
     /**
-     * @param recipeKey   the object the availability data is cached under (the
-     *                    viewer's recipe/display object)
-     * @param ingredients the recipe's input ingredients, in slot order
+     * @param recipeKey       the object the availability data is cached under
+     *                        (the viewer's recipe/display object)
+     * @param ingredients     the recipe's input ingredients, in slot order
+     * @param resultsPerCraft output items per craft — converts the server's
+     *                        whole-crafts count into the "Can make: N" line
      */
-    public static List<Component> build(Object recipeKey, List<Ingredient> ingredients) {
+    public static List<Component> build(Object recipeKey, List<Ingredient> ingredients, int resultsPerCraft) {
         int total = (int) ingredients.stream().filter(i -> !i.isEmpty()).count();
         List<Boolean> shortages = AvailabilityCache.shortagesFor(recipeKey);
         List<Boolean> craftable = AvailabilityCache.craftableFor(recipeKey);
@@ -63,13 +65,26 @@ public final class PullTooltipBuilder {
                     .withStyle(ChatFormatting.GREEN));
         }
 
+        // "Can make: N" — whole crafts the stock supports (server-computed,
+        // ratios respected) times the recipe's output count.
+        Integer crafts = AvailabilityCache.craftsFor(recipeKey);
+        if (crafts != null) {
+            long makeable = (long) crafts * Math.max(1, resultsPerCraft);
+            lines.add(Component.translatable("jackittome.button.recipe_pull.can_make", makeable)
+                    .withStyle(ChatFormatting.GRAY));
+        }
+
+        // Same modifier language as the pull keybinds: Shift = stack, Ctrl = max.
+        // With a shortage, plain click only opens autocraft popups — say so and
+        // name the (rebindable) override key that pulls in-stock items anyway.
         int inStock = total - totalMissing;
         if (shortages != null && inStock > 0 && totalMissing > 0) {
-            String key = (missingCraftable > 0)
-                    ? "jackittome.button.recipe_pull.shift_hint"
-                    : "jackittome.button.recipe_pull.shift_partial";
-            lines.add(Component.translatable(key).withStyle(ChatFormatting.DARK_GRAY, ChatFormatting.ITALIC));
+            lines.add(Component.translatable("jackittome.button.recipe_pull.gate_hint",
+                            KeyBindings.PULL_OVERRIDE.getTranslatedKeyMessage())
+                    .withStyle(ChatFormatting.DARK_GRAY, ChatFormatting.ITALIC));
         }
+        lines.add(Component.translatable("jackittome.button.recipe_pull.modifier_hint")
+                .withStyle(ChatFormatting.DARK_GRAY, ChatFormatting.ITALIC));
         return lines;
     }
 }

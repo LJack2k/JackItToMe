@@ -7,6 +7,7 @@ import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.event.RegisterKeyMappingsEvent;
 import net.neoforged.neoforge.client.settings.KeyConflictContext;
+import net.neoforged.neoforge.client.settings.KeyModifier;
 import org.lwjgl.glfw.GLFW;
 
 /**
@@ -15,9 +16,15 @@ import org.lwjgl.glfw.GLFW;
  * Registration happens on the mod event bus during client init.
  * Press detection lives in {@link ClientEvents}.
  * <p>
- * The "jack hovered" keybind is bound to {@code GUI} conflict context — it only
- * fires while a screen is open, so it never collides with vanilla overworld
- * bindings like P (which has no default vanilla mapping anyway, but better safe).
+ * The three pull quantities are separate keybinds (not one bind plus
+ * hardcoded modifiers) so the Controls screen itself documents them and each
+ * is independently rebindable. Defaults share the physical G key with NeoForge
+ * {@link KeyModifier} defaults: G / Shift+G / Ctrl+G — G is unbound in vanilla
+ * and one-handed with both modifiers (the original default P was a far-right
+ * stretch and collides with vanilla's Social Interactions key).
+ * <p>
+ * All three use {@code GUI} conflict context — they only fire while a screen
+ * is open, so they never collide with vanilla overworld bindings.
  */
 @EventBusSubscriber(modid = nl.ljack2k.jackittome.JackItToMe.MODID,
                     value = Dist.CLIENT,
@@ -32,12 +39,50 @@ public final class KeyBindings {
             "key.jackittome.jack_hovered",
             KeyConflictContext.GUI,
             InputConstants.Type.KEYSYM,
-            GLFW.GLFW_KEY_P,
+            GLFW.GLFW_KEY_G,
+            CATEGORY
+    );
+
+    /** Same, but pulls one full stack (up to the item's max stack size). */
+    public static final KeyMapping JACK_STACK = new KeyMapping(
+            "key.jackittome.jack_stack",
+            KeyConflictContext.GUI,
+            KeyModifier.SHIFT,
+            InputConstants.Type.KEYSYM,
+            GLFW.GLFW_KEY_G,
+            CATEGORY
+    );
+
+    /** Same, but pulls as much as fits in the player's inventory. */
+    public static final KeyMapping JACK_MAX = new KeyMapping(
+            "key.jackittome.jack_max",
+            KeyConflictContext.GUI,
+            KeyModifier.CONTROL,
+            InputConstants.Type.KEYSYM,
+            GLFW.GLFW_KEY_G,
+            CATEGORY
+    );
+
+    /**
+     * Hold-modifier for the recipe pull button: held during a plain click it
+     * bypasses the review-first gate — in-stock ingredients pull at recipe
+     * amounts while autocraft popups still open for the missing ones. Not a
+     * press-action bind; {@code PullButtonClick} samples its key state at
+     * click time (keyboard binds only).
+     */
+    public static final KeyMapping PULL_OVERRIDE = new KeyMapping(
+            "key.jackittome.pull_override",
+            KeyConflictContext.GUI,
+            InputConstants.Type.KEYSYM,
+            GLFW.GLFW_KEY_LEFT_ALT,
             CATEGORY
     );
 
     @SubscribeEvent
     public static void register(RegisterKeyMappingsEvent event) {
         event.register(JACK_HOVERED);
+        event.register(JACK_STACK);
+        event.register(JACK_MAX);
+        event.register(PULL_OVERRIDE);
     }
 }

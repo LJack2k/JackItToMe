@@ -12,7 +12,7 @@ will otherwise have to answer by spelunking through source.
 A NeoForge 1.21.x mod that pulls items from a player's currently-open
 inventory/storage into the player's own inventory. Two complementary UIs:
 
-**Keybind** (default <kbd>P</kbd>): hover any item anywhere in the open
+**Keybind** (default <kbd>G</kbd>; was <kbd>P</kbd> before 0.7.0): hover any item anywhere in the open
 screen, press the key, one of that item moves into the player's inventory.
 Modifier keys change quantity — Shift = a full stack, Ctrl = as much as
 will fit. If the hovered item isn't in stock but the open AE2/RS network
@@ -30,21 +30,44 @@ fully fulfill get a translucent red overlay (uncraftable) or green overlay
 (craftable in AE2/RS) on their slot, in declared order (top row first,
 left-to-right).
 
-Clicking the button has two flags driven by Shift:
-- **Plain click**:
+Clicking the button maps modifiers to (PullMode, pullAvailable) in the
+shared `client/PullButtonClick.send` (JEI, EMI, and REI all route through
+it). Quantity modifiers mean the same as on the keybinds — Shift = stack,
+Ctrl = max, Ctrl beats Shift:
+- **Plain click** (SINGLE, pull=false):
   - If everything is in stock (no shortage of any kind): pulls every
-    ingredient. The trivial case.
-  - If any ingredient is missing: triggers the AE2/RS autocraft chain
-    for the missing-but-craftable ones and does **not** pull anything —
-    even ingredients that are in stock stay in storage.
-- **Shift+click** always pulls every in-stock ingredient *and* triggers
-  the autocraft chain for any missing-but-craftable ones.
+    ingredient at recipe amounts. The trivial case.
+  - If any ingredient is missing: triggers the autocraft chain for the
+    missing-but-craftable ones and does **not** pull anything — even
+    ingredients that are in stock stay in storage (review-first gate).
+- **Alt+click** (SINGLE, pull=true) — the gate override: pulls every
+  in-stock ingredient at recipe amounts *and* triggers the autocraft
+  chain. Alt is the default of the rebindable `PULL_OVERRIDE` KeyMapping;
+  `PullButtonClick.isOverrideHeld` samples its bound key's GLFW state at
+  click time (keyboard binds only — a mouse-bound override never reads
+  as held).
+- **Shift+click** (STACK, pull=true) pulls materials for a full stack of
+  the OUTPUT: ceil(64 / resultsPerCraft) whole crafts — a book (1
+  result/craft) wants 64 crafts = 192 paper + 64 leather. Bulk modes
+  preserve recipe ratios via a craft multiplier
+  (`PullHandler.simulateBulk`): with 64 paper / 3 leather stocked it
+  pulls 9 + 3 (3 whole crafts), not 64 + 3. Craftable ingredients don't
+  limit the target — their gap toward it pre-fills the autocraft popups.
+  The viewers pass resultsPerCraft from the recipe's first output slot
+  (payload field, protocol "6").
+- **Ctrl+click** (MAX, pull=true) same, capped at MAX_PER_CLICK per
+  ingredient instead of a stack of results.
+- **Alt+Shift / Alt+Ctrl** — bulk with `fillPartial=true`: each
+  ingredient fills toward the mode cap independently from its own stock
+  (partial crafts allowed), so one missing ingredient doesn't zero the
+  pull. Autocraft gaps still queue toward the (non-craftable-clamped)
+  target.
 
-Autocraft fires on both click types when any ingredient is
-missing-but-craftable. Shift is the "always pull" modifier; without it,
-plain click pulls only when there's no shortage. There is no "block on
-shortage" failure animation — plain click against an uncraftable-only
-shortage is simply a no-op.
+Autocraft fires on every click type when any ingredient is
+missing-but-craftable. Any modifier implies pulling; a bare plain click
+pulls only when there's no shortage. There is no "block on shortage"
+failure animation — plain click against an uncraftable-only shortage is
+simply a no-op.
 
 Items come from whatever container is open behind the cursor: vanilla
 containers (chests, shulkers, barrels, the player's own inventory), AE2 ME
@@ -60,14 +83,19 @@ per session.
 
 ### Keybind path
 
-`KeyBindings` registers the keybind on the mod event bus.
-`ClientEvents.onScreenKey` intercepts every `ScreenEvent.KeyPressed.Pre`,
-compares the key to the binding, builds an `Ingredient` from what the cursor
-points at — first trying `JeiRecipeSlotProbe.getAllItemsUnderMouse` for
-multi-variant recipe slots, falling back to `AbstractContainerScreen#getSlotUnderMouse`
+`KeyBindings` registers three keybinds on the mod event bus — one per
+`PullMode` (SINGLE / STACK / MAX), defaulting to G / Shift+G / Ctrl+G via
+NeoForge `KeyModifier`s so each is independently rebindable and the Controls
+screen documents them. `ClientEvents.onScreenKey` intercepts every
+`ScreenEvent.KeyPressed.Pre`, matches via `isActiveAndMatches` most-specific
+first (MAX, then STACK, then SINGLE — NONE-modifier binds also match with a
+modifier held), builds an `Ingredient` from what the cursor points at — first
+trying `JeiRecipeSlotProbe.getAllItemsUnderMouse` for multi-variant recipe
+slots, falling back to `AbstractContainerScreen#getSlotUnderMouse`
 (vanilla containers) or JEI's `IIngredientListOverlay` /
-`IBookmarkOverlay#getIngredientUnderMouse` (sidebars). Modifier keys decide
-`PullMode` (Ctrl → MAX, Shift → STACK, else SINGLE). Sends a
+`IBookmarkOverlay#getIngredientUnderMouse` (sidebars). Hovered stacks are
+normalized to count 1 before wrapping (the ingredient's embedded count is the
+server's per-slot request — a hovered 64-stack must not request 64). Sends a
 `PullIngredientsPayload(List<Ingredient>, PullMode)` to the server.
 
 ### Recipe-button path
@@ -96,11 +124,13 @@ controller's `drawExtras` does two things every frame:
 
 The controller's `onPress`:
 - Skips the click if `isSimulate()`.
-- Reads `Screen.hasShiftDown()` (NOT `input.getModifiers()` — see §5.1.1).
-- Always ships `PullIngredientsPayload(ingredients, PullMode.SINGLE,
-  pullAvailable=shift, triggerAutocraft=true)`. Plain click sends
-  `(false, true)`, Shift+click sends `(true, true)`. Empty recipe slots are
-  preserved as `Ingredient.EMPTY` for index alignment with the shortage list.
+- Delegates to `client/PullButtonClick.send`, which reads live
+  `Screen.hasShiftDown()`/`hasControlDown()` (NOT `input.getModifiers()` —
+  see §5.1.1) plus the rebindable override key, and maps
+  plain/Alt/Shift/Ctrl to (SINGLE,false)/(SINGLE,true)/(STACK,true)/
+  (MAX,true) with `triggerAutocraft=true` always. EMI and REI call the
+  same helper. Empty recipe slots are preserved as `Ingredient.EMPTY` for
+  index alignment with the shortage list.
 
 ### Server-side fulfillment (shared by both paths)
 
@@ -152,7 +182,7 @@ JackItToMe/                          (repo root, holds shared config)
         │   │   └── ContainerItemSource.java     Vanilla AbstractContainerMenu walker (fallback)
         │   ├── client/
         │   │   ├── KeyBindings.java             Mod-bus keybind registration
-        │   │   ├── ClientEvents.java            P-key handler, hover lookup, packet send
+        │   │   ├── ClientEvents.java            Pull-key handler, tooltip hint, hover lookup, packet send
         │   │   ├── ClientFeedback.java          Dispatches animation from feedback packet
         │   │   ├── JackAnimations.java          Falling-into-hotbar + red-shake-fade visuals
         │   │   ├── AvailabilityCache.java       Recipe→shortages cache, nonce-matched
@@ -191,7 +221,7 @@ Both lists are sent in `AvailabilityResponsePayload`. `JackPullButtonController.
 drawShortageOverlays` paints red (`0x80FF4040`) for non-craftable shortages
 and green (`0x8040FF40`) for craftable ones.
 
-**P keybind on a missing-but-craftable item**: `PullHandler` notices the
+**Pull keybind on a missing-but-craftable item**: `PullHandler` notices the
 single-ingredient pull moved nothing AND the source reports it craftable. It
 calls `source.openAutoCraftPopup(stack, amount, player)` instead of shipping
 a failure feedback packet — so no red shake animation, the native popup
@@ -264,7 +294,7 @@ successor popup, if any, gets a chance to open first).
 
 ### 3a.2 Network protocol version
 
-`ModPackets.register` calls `.versioned("5")`. Bump on every wire-format
+`ModPackets.register` calls `.versioned("6")`. Bump on every wire-format
 break. Current history:
 - `"1"`: initial release
 - `"2"`: `AvailabilityResponsePayload` gained `craftable[]`
@@ -277,6 +307,13 @@ break. Current history:
   `(List<ItemStack> successItems, ItemStack failureItem)`. Server now
   collects per-`Item` totals during the extract loop; client fans out
   one staggered success animation per unique pulled ingredient type.
+- `"6"`: `PullIngredientsPayload` gained `resultsPerCraft`; STACK mode
+  became "materials for a stack of the output" in whole crafts (recipe
+  ratios preserved) instead of a stack per slot.
+  `AvailabilityResponsePayload` gained `craftsPossible` — whole crafts
+  current stock supports — surfaced as the tooltip's "Current stock can
+  make: N" line (client multiplies by resultsPerCraft; deliberately
+  stock-only so nobody reads autocraft potential into it).
 
 ## 4. Where the seams are
 
@@ -288,8 +325,9 @@ or `IngredientResolver`.
 
 **`PullMode`** — input/policy. New quantity modes go here; the mode flows
 through the packet unchanged, only the `switch` in `PullHandler.handle`
-interprets it. `ClientEvents` wires `Screen.hasShiftDown()` / `hasControlDown()`
-to STACK / MAX.
+interprets it. Each mode has its own `KeyMapping` in `KeyBindings`
+(defaults G / Shift+G / Ctrl+G); `ClientEvents.onScreenKey` maps binding →
+mode, most-specific first.
 
 **`JackPullButtonController.drawExtras`** — anything that needs to render
 per-recipe and work for all recipe types belongs here, not in a decorator.
@@ -428,8 +466,12 @@ JEI, AE2, RS, guideme are pulled via CurseMaven at runtime.
 1. New creative world, place a chest, put 8 oak planks in it.
 2. Open the chest.
 3. Hover an item — in the chest, in your inventory, or in JEI's sidebar.
-4. Press P. One item moves chest → inventory.
-5. Try Shift+P (one stack), Ctrl+P (as much as fits).
+4. Press G. One item moves chest → inventory (exactly one, even from a
+   full stack — the hovered-stack count must not leak into the request).
+5. Try Shift+G (one stack), Ctrl+G (as much as fits).
+6. Open Options → Controls, confirm the JackItToMe category lists three
+   binds: Jack hovered item (G), Jack a full stack (Shift+G), Jack as
+   much as fits (Ctrl+G).
 
 **Recipe-button path (vanilla container, no autocraft available):**
 1. Stand at the chest with 7 oak planks in it (one short of a chest recipe).
@@ -437,12 +479,17 @@ JEI, AE2, RS, guideme are pulled via CurseMaven at runtime.
 3. Hover the J button. Within ~50ms the 8th plank slot gets a **red** overlay
    (no AE2/RS, so no green).
 4. Click without modifier — **no-op** (no items pulled, no animation, no
-   autocraft path on a vanilla container). Tooltip hint shows "Hold Shift
-   to pull what's in stock".
-5. Shift+click — pulls 7 planks. One slot stays unfulfilled.
+   autocraft path on a vanilla container). Tooltip gate hint shows
+   "hold Left Alt to also pull what's in stock"; the modifier hint line
+   ("Shift: a stack of each · Ctrl: as much as fits") is always present.
+5. Alt+click — pulls 7 planks at recipe amounts. One slot stays unfulfilled.
 6. Add the 8th plank to the chest, wait one refresh cycle (~750ms), red
    overlay should disappear.
 7. Now plain click — pulls all 8 (no shortage, so plain click pulls).
+8. Refill the chest with plenty of planks: Shift+click pulls 512 planks
+   (64 whole crafts × 8 planks — materials for a stack of chests, the
+   chest recipe outputs 1 per craft), Ctrl+click pulls as many whole
+   crafts as the chest and your inventory support.
 
 **Recipe-button path (AE2 terminal with autocraft):**
 1. Set up an AE2 ME network with a pattern producer for oak planks
@@ -451,14 +498,14 @@ JEI, AE2, RS, guideme are pulled via CurseMaven at runtime.
 3. Open the ME terminal, view the wooden chest recipe in JEI.
 4. Hover the J button — all 8 plank slots get a **green** overlay (within ~100ms).
 5. Tooltip shows `8 ingredient(s) needed` / `8 can be autocrafted` /
-   no shift hint (nothing in stock to pull).
+   no gate hint (nothing in stock to pull).
 6. Plain click — AE2's CraftAmountMenu opens, pre-filled with **8**.
    No items move into the player's inventory yet.
 7. Cancel out, fill the network with 6 planks, hover J — 6 slots clear,
    2 stay green. Tooltip: `8 ingredient(s) needed` / `2 can be autocrafted` /
-   `Hold Shift to also pull what's in stock`.
+   the gate hint naming the override key.
 8. Plain click — popup opens pre-filled with **2** (the shortfall, not 8).
-9. Cancel, then Shift+click — 6 planks pull into inventory with fanned-out
+9. Cancel, then Alt+click — 6 planks pull into inventory with fanned-out
    animation, popup opens for 2 more.
 
 **Cache-clear test:**

@@ -7,6 +7,7 @@ import nl.ljack2k.jackittome.rei.ReiViewerBridge;
 import nl.ljack2k.jackittome.network.PullIngredientsPayload;
 import nl.ljack2k.jackittome.network.PullMode;
 
+import com.mojang.blaze3d.platform.InputConstants;
 import com.mojang.blaze3d.platform.Window;
 
 import net.minecraft.client.Minecraft;
@@ -32,7 +33,8 @@ import java.util.List;
  * <p>
  * The recipe-screen pull button is added by each viewer's own plugin using
  * that viewer's native widget API (JEI button factory, EMI recipe decorator,
- * REI category extension). This class only handles the P keybind.
+ * REI category extension). This class only handles the three pull keybinds
+ * (defaults G / Shift+G / Ctrl+G — see {@link KeyBindings}).
  */
 @EventBusSubscriber(modid = JackItToMe.MODID, value = net.neoforged.api.distmarker.Dist.CLIENT)
 public final class ClientEvents {
@@ -65,11 +67,18 @@ public final class ClientEvents {
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null) return;
 
-        int pressedKey = event.getKeyCode();
-        int boundKey   = KeyBindings.JACK_HOVERED.getKey().getValue();
-        if (pressedKey != boundKey) return;
+        // Most specific first: with the default layout all three share the
+        // physical G key and differ only in KeyModifier, and NONE-modifier
+        // binds also match while a modifier is held — so checking MAX before
+        // STACK before SINGLE keeps "Ctrl beats Shift beats plain".
+        InputConstants.Key key = InputConstants.getKey(event.getKeyCode(), event.getScanCode());
+        PullMode mode;
+        if      (KeyBindings.JACK_MAX.isActiveAndMatches(key))     mode = PullMode.MAX;
+        else if (KeyBindings.JACK_STACK.isActiveAndMatches(key))   mode = PullMode.STACK;
+        else if (KeyBindings.JACK_HOVERED.isActiveAndMatches(key)) mode = PullMode.SINGLE;
+        else return;
 
-        handleJackHovered(mc);
+        handleJackHovered(mc, mode);
         event.setCanceled(true);
     }
 
@@ -92,7 +101,7 @@ public final class ClientEvents {
 
     // ---- Pull logic -----------------------------------------------------
 
-    private static void handleJackHovered(Minecraft mc) {
+    private static void handleJackHovered(Minecraft mc, PullMode mode) {
         Ingredient ing = tryRecipeSlotIngredient(mc);
 
         if (ing == null) {
@@ -101,17 +110,18 @@ public final class ClientEvents {
                 JackItToMe.LOGGER.debug("[JackItToMe] Jack key pressed but no hovered item found.");
                 return;
             }
-            ing = Ingredient.of(hovered);
+            // Normalize to count 1: the server reads the ingredient's embedded
+            // count as the per-slot request ("recipe wants 3"), but a hovered
+            // container slot carries however many happen to be stacked there —
+            // wrapping a 64-stack unnormalized made SINGLE pull the whole stack.
+            ing = Ingredient.of(hovered.copyWithCount(1));
         }
 
-        PullMode mode;
-        if (Screen.hasControlDown())     mode = PullMode.MAX;
-        else if (Screen.hasShiftDown())  mode = PullMode.STACK;
-        else                             mode = PullMode.SINGLE;
         JackItToMe.LOGGER.info("[JackItToMe] Jack key pressed — mode={}", mode);
 
         PacketDistributor.sendToServer(new PullIngredientsPayload(
-                List.of(ing), mode, /*pullAvailable=*/ true, /*triggerAutocraft=*/ true));
+                List.of(ing), mode, /*resultsPerCraft=*/ 1,
+                /*pullAvailable=*/ true, /*fillPartial=*/ false, /*triggerAutocraft=*/ true));
     }
 
     private static Ingredient tryRecipeSlotIngredient(Minecraft mc) {
@@ -126,7 +136,12 @@ public final class ClientEvents {
         if (variants.size() < 2) return null;
 
         JackItToMe.LOGGER.info("[JackItToMe] Requesting recipe slot with {} acceptable variants.", variants.size());
-        return Ingredient.of(variants.toArray(ItemStack[]::new));
+        // Same count normalization as the plain hover path: the keybind means
+        // "pull one" (modifiers scale it) — recipe-slot display counts are not
+        // the request.
+        return Ingredient.of(variants.stream()
+                .map(s -> s.copyWithCount(1))
+                .toArray(ItemStack[]::new));
     }
 
     private static ItemStack hoveredItemStack(Minecraft mc) {

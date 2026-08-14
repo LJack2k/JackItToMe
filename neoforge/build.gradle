@@ -190,6 +190,16 @@ dependencies {
         runtimeOnly "curse.maven:integrated-crafting-287357:${integratedcrafting_curse_file_id}"
     }
 
+    // ---- Sophisticated Storage (dev-only, no compile-time integration) ----
+    // SS storages ride the vanilla ContainerItemSource fallback, so there's
+    // nothing to compile against — this exists purely to reproduce slot-
+    // settings issues (memory slot / no-sort, issue #4) in the dev client:
+    //   ./gradlew :neoforge:runClient -PwithSophisticated
+    if (project.hasProperty('withSophisticated')) {
+        runtimeOnly "curse.maven:sophisticated-storage-619320:${sophisticatedstorage_curse_file_id}"
+        runtimeOnly "curse.maven:sophisticated-core-618298:${sophisticatedcore_curse_file_id}"
+    }
+
     // ---- EMI (optional recipe viewer) ----
     compileOnly "dev.emi:emi-neoforge:${emi_version}:api"
     if (recipeViewer == 'emi') {

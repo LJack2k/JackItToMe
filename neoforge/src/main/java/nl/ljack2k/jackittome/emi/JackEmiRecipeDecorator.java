@@ -2,18 +2,14 @@ package nl.ljack2k.jackittome.emi;
 
 import nl.ljack2k.jackittome.JackItToMe;
 import nl.ljack2k.jackittome.client.PullTooltipBuilder;
-import nl.ljack2k.jackittome.network.PullIngredientsPayload;
-import nl.ljack2k.jackittome.network.PullMode;
 
 import dev.emi.emi.api.recipe.EmiRecipe;
 import dev.emi.emi.api.recipe.EmiRecipeDecorator;
 import dev.emi.emi.api.widget.WidgetHolder;
 
-import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.inventory.tooltip.ClientTooltipComponent;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.crafting.Ingredient;
-import net.neoforged.neoforge.network.PacketDistributor;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -51,7 +47,7 @@ public final class JackEmiRecipeDecorator implements EmiRecipeDecorator {
         // (the button's render hook keeps it refreshed while hovered).
         widgets.addTooltip((mx, my) -> {
             List<ClientTooltipComponent> out = new ArrayList<>();
-            for (Component line : PullTooltipBuilder.build(recipe, ingredients)) {
+            for (Component line : PullTooltipBuilder.build(recipe, ingredients, resultsPerCraft(recipe))) {
                 out.add(ClientTooltipComponent.create(line.getVisualOrderText()));
             }
             return out;
@@ -59,16 +55,23 @@ public final class JackEmiRecipeDecorator implements EmiRecipeDecorator {
     }
 
     private static void sendPull(EmiRecipe recipe, List<Ingredient> ingredients) {
-        if (ingredients.stream().allMatch(Ingredient::isEmpty)) {
-            JackItToMe.LOGGER.debug("[JackItToMe] EMI recipe button clicked but recipe has no input slots.");
-            return;
+        // Modifier → mode mapping is shared across viewers in PullButtonClick.
+        nl.ljack2k.jackittome.client.PullButtonClick.send(
+                "EMI", ingredients, resultsPerCraft(recipe), false);
+    }
+
+    /**
+     * How many output items one craft produces (first output's amount) —
+     * drives STACK mode's "a stack of the result" target. EMI models the
+     * count as {@code EmiStack.getAmount()}, not on the key ItemStack.
+     */
+    private static int resultsPerCraft(EmiRecipe recipe) {
+        if (recipe == null) return 1;
+        for (var output : recipe.getOutputs()) {
+            if (output != null && !output.isEmpty()) {
+                return (int) Math.max(1, Math.min(output.getAmount(), Integer.MAX_VALUE));
+            }
         }
-        // Shift = also pull what's in stock; autocraft always fires. Mirrors the
-        // JEI button controller's semantics (see JackPullButtonController.onPress).
-        boolean shift = Screen.hasShiftDown();
-        JackItToMe.LOGGER.info("[JackItToMe] EMI recipe button: {} ingredients, pull={}, autocraft=true.",
-                ingredients.size(), shift);
-        PacketDistributor.sendToServer(new PullIngredientsPayload(
-                ingredients, PullMode.SINGLE, /*pullAvailable=*/ shift, /*triggerAutocraft=*/ true));
+        return 1;
     }
 }
