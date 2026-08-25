@@ -1,11 +1,13 @@
 {
   "required": false,
   "minVersion": "0.8.5",
-  "package": "nl.ljack2k.jackittome.emi.mixin",
-  "plugin": "nl.ljack2k.jackittome.emi.mixin.EmiMixinPlugin",
+  "package": "nl.ljack2k.jackittome.mixin",
+  "plugin": "nl.ljack2k.jackittome.ViewerMixinPlugin",
   "compatibilityLevel": "JAVA_21",
   "client": [
-    "RecipeDisplayMixin"
+    "emi.RecipeDisplayMixin",
+    "rei.DefaultDisplayViewingScreenMixin",
+    "rei.CompositeDisplayViewingScreenMixin"
   ],
   "injectors": {
     "defaultRequire": 0

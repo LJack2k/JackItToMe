@@ -6,11 +6,9 @@ import nl.ljack2k.jackittome.client.PullTooltipBuilder;
 import dev.emi.emi.api.recipe.EmiRecipe;
 import dev.emi.emi.api.widget.WidgetHolder;
 
-import net.minecraft.client.gui.screens.inventory.tooltip.ClientTooltipComponent;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.crafting.Ingredient;
 
-import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -38,24 +36,20 @@ public final class JackEmiButtonFactory {
      * {@code RecipeDisplayMixin} to sit in the column it reserved beside the
      * recipe body.
      */
-    public void decorate(EmiRecipe recipe, WidgetHolder widgets, int x, int y) {
+    public void decorate(EmiRecipe recipe, WidgetHolder widgets, int groupX, int groupY,
+                         int x, int y) {
         List<Ingredient> ingredients = EmiStacks.inputIngredients(recipe);
         if (ingredients.stream().allMatch(Ingredient::isEmpty)) {
             return; // output-only display (e.g. info recipes) — nothing to pull.
         }
 
-        widgets.add(new JackEmiButton(x, y, recipe, ingredients,
+        // The tooltip is rendered by PullButtonTooltip rather than registered with
+        // EMI: the button sits left of the recipe, and EMI would open the tooltip
+        // over it, hiding the shortage highlights. Recomputed per frame from the
+        // live AvailabilityCache, which the button's render hook keeps refreshed.
+        widgets.add(new JackEmiButton(x, y, groupX, groupY, recipe, ingredients,
+                () -> PullTooltipBuilder.build(recipe, ingredients, resultsPerCraft(recipe)),
                 (mouseX, mouseY, button) -> sendPull(recipe, ingredients)));
-
-        // Dynamic tooltip — recomputed each hover from the live AvailabilityCache
-        // (the button's render hook keeps it refreshed while hovered).
-        widgets.addTooltip((mx, my) -> {
-            List<ClientTooltipComponent> out = new ArrayList<>();
-            for (Component line : PullTooltipBuilder.build(recipe, ingredients, resultsPerCraft(recipe))) {
-                out.add(ClientTooltipComponent.create(line.getVisualOrderText()));
-            }
-            return out;
-        }, x, y, JackEmiButton.SIZE, JackEmiButton.SIZE);
     }
 
     private static void sendPull(EmiRecipe recipe, List<Ingredient> ingredients) {

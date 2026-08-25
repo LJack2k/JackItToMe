@@ -19,16 +19,8 @@ public final class JackConfig {
     static {
         ModConfigSpec.Builder b = new ModConfigSpec.Builder();
 
-        b.comment(
-                "EMI integration.",
-                "",
-                "The jack button gets its own column beside each recipe, so it is always",
-                "visible and never overlaps recipe content, whatever a recipe's shape.",
-                "These options only fine-tune where it sits."
-        ).push("emi");
-
         SHOW_RECIPE_BUTTON = b
-                .comment("Show the jack button on recipes at all.",
+                .comment("Show the jack button on recipes, in whichever recipe viewer you use.",
                         "",
                         "Turn this off if you would rather pull only with the keybinds. The rest of",
                         "the mod — the G keys, autocrafting, the hover tooltip — is unaffected.",
@@ -39,27 +31,32 @@ public final class JackConfig {
                 .define("showRecipeButton", true);
 
         BUTTON_OFFSET_X = b
-                .comment("Horizontal nudge for the recipe button, in GUI pixels. Positive moves it right.",
-                        "Zero is the default spot: its own column, vertically centred on the recipe.")
+                .comment("EMI and REI only. Horizontal nudge for the recipe button, in GUI pixels.",
+                        "Positive moves it right. Zero is the default spot: its own column beside",
+                        "the recipe, vertically centred.",
+                        "",
+                        "JEI is not affected: it decides where its own recipe buttons go.")
                 .translation("jackittome.configuration.buttonOffsetX")
                 .defineInRange("buttonOffsetX", 0, -128, 128);
 
         BUTTON_OFFSET_Y = b
-                .comment("Vertical nudge for the recipe button, in GUI pixels. Positive moves it down.")
+                .comment("EMI and REI only. Vertical nudge for the recipe button, in GUI pixels.",
+                        "Positive moves it down.")
                 .translation("jackittome.configuration.buttonOffsetY")
                 .defineInRange("buttonOffsetY", 0, -128, 128);
 
         PLACEMENT_KEYS = b
-                .comment("Opt-in: allow Ctrl + arrow keys to reposition the recipe button while a recipe",
-                        "screen is open (Ctrl+Home resets it). Each nudge is saved to buttonOffsetX/Y",
-                        "above. Off by default so the key combination stays free for everyone who is",
-                        "happy with the default placement; turn it on, position the button, and turn it",
-                        "back off if you like. Ignored while the recipe viewer's search box has focus,",
-                        "so it never eats Ctrl+Left/Right word-jump while you are typing.")
+                .comment("EMI and REI only. Opt-in: allow Ctrl + arrow keys to reposition the recipe",
+                        "button while a recipe screen is open (Ctrl+Home resets it). Each nudge is",
+                        "saved to buttonOffsetX/Y above, so you can switch this back off once the",
+                        "position looks right.",
+                        "",
+                        "Off by default so the key combination stays free for everyone happy with the",
+                        "default placement. Ignored while the recipe viewer's search box has focus, so",
+                        "it never eats Ctrl+Left/Right word-jump while you are typing.")
                 .translation("jackittome.configuration.placementKeys")
                 .define("placementKeys", false);
 
-        b.pop();
         SPEC = b.build();
     }
 }

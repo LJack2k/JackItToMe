@@ -2,6 +2,7 @@ package nl.ljack2k.jackittome.emi;
 
 import nl.ljack2k.jackittome.JackItToMe;
 import nl.ljack2k.jackittome.client.ButtonPlacement;
+import nl.ljack2k.jackittome.client.PullButtonTooltip;
 import nl.ljack2k.jackittome.client.PullHoverPoller;
 
 import dev.emi.emi.api.recipe.EmiRecipe;
@@ -9,10 +10,12 @@ import dev.emi.emi.api.widget.Bounds;
 import dev.emi.emi.api.widget.ButtonWidget;
 
 import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.crafting.Ingredient;
 
 import java.util.List;
+import java.util.function.Supplier;
 
 /**
  * EMI-native button rendered inside every recipe display by
@@ -50,12 +53,26 @@ public final class JackEmiButton extends ButtonWidget {
     private final EmiRecipe recipe;
     private final List<Ingredient> ingredients;
     private final PullHoverPoller poller = new PullHoverPoller();
+    private final int groupX;
+    private final int groupY;
+    private final Supplier<List<Component>> tooltip;
 
-    public JackEmiButton(int x, int y, EmiRecipe recipe, List<Ingredient> ingredients,
+    /**
+     * @param groupX  screen X of the widget group this button belongs to. EMI
+     *                renders widgets translated to that origin, so the button's
+     *                own coordinates are relative; the tooltip is drawn later in
+     *                screen space and needs the absolute position.
+     * @param tooltip supplied per frame, so the in-stock counts stay live
+     */
+    public JackEmiButton(int x, int y, int groupX, int groupY, EmiRecipe recipe,
+                         List<Ingredient> ingredients, Supplier<List<Component>> tooltip,
                          ButtonWidget.ClickAction action) {
         super(x, y, SIZE, SIZE, 0, 0, ICON, () -> true, action);
+        this.groupX = groupX;
+        this.groupY = groupY;
         this.recipe = recipe;
         this.ingredients = ingredients;
+        this.tooltip = tooltip;
     }
 
     /**
@@ -79,5 +96,11 @@ public final class JackEmiButton extends ButtonWidget {
                 0.0F, hovered ? SIZE : 0.0F, SIZE, SIZE, SIZE, SHEET_HEIGHT);
         // Drive the availability refresh so the tooltip's counts stay current.
         poller.tick(hovered, recipe, ingredients);
+
+        if (hovered) {
+            // Drawn by us, to the LEFT, so it never covers the recipe and the
+            // shortage highlights the player is hovering to read.
+            PullButtonTooltip.show(groupX + x, groupY + y, tooltip.get());
+        }
     }
 }

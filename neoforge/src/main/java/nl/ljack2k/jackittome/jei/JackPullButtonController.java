@@ -75,14 +75,21 @@ public class JackPullButtonController implements IIconButtonController {
     @Override
     public void initState(IButtonState state) {
         state.setIcon(icon);
-        state.setVisible(true);
-        state.setActive(true);
+        applyVisibility(state);
     }
 
     @Override
     public void updateState(IButtonState state) {
-        // No per-frame state changes for now. (Could go inactive if the player has
-        // no container open, but the server already handles that case cleanly.)
+        // Re-evaluated every frame: the player can close the container behind the
+        // recipe view, or flip the config, without the recipe view being rebuilt.
+        applyVisibility(state);
+    }
+
+    /** Hidden when disabled in the config, or when there is nothing to pull from. */
+    private static void applyVisibility(IButtonState state) {
+        boolean show = nl.ljack2k.jackittome.client.PullTarget.shouldShowButton();
+        state.setVisible(show);
+        state.setActive(show);
     }
 
     @Override

@@ -2,6 +2,8 @@ package nl.ljack2k.jackittome.rei;
 
 import nl.ljack2k.jackittome.JackItToMe;
 import nl.ljack2k.jackittome.client.AvailabilityCache;
+import nl.ljack2k.jackittome.client.ButtonPlacement;
+import nl.ljack2k.jackittome.client.PullButtonTooltip;
 import nl.ljack2k.jackittome.client.PullHoverPoller;
 import nl.ljack2k.jackittome.client.PullTooltipBuilder;
 
@@ -9,7 +11,6 @@ import me.shedaniel.math.Rectangle;
 import me.shedaniel.rei.api.client.gui.DisplayRenderer;
 import me.shedaniel.rei.api.client.gui.widgets.Button;
 import me.shedaniel.rei.api.client.gui.widgets.Slot;
-import me.shedaniel.rei.api.client.gui.widgets.Tooltip;
 import me.shedaniel.rei.api.client.gui.widgets.Widget;
 import me.shedaniel.rei.api.client.gui.widgets.Widgets;
 import me.shedaniel.rei.api.client.registry.category.extension.CategoryExtensionProvider;
@@ -36,20 +37,21 @@ import java.util.List;
  */
 public final class JackReiButtonExtension<T extends Display> implements CategoryExtensionProvider<T> {
 
-    private static final ResourceLocation ICON =
-            ResourceLocation.fromNamespaceAndPath(JackItToMe.MODID, "textures/gui/jack_icon.png");
-
     /**
-     * The icon texture's native size in GUI units — blitted 1:1, never scaled.
-     * Keep in sync with the PNG and with {@code JackEmiButton.ICON_SIZE}.
+     * The complete button sprite, border included — the same 12x24 sheet EMI uses
+     * (normal state at v=0, hover at v=12). REI's own button frame is drawn
+     * underneath and covered completely: the sprite is fully opaque and exactly
+     * button-sized, which avoids the frame-inside-a-frame look that a borderless
+     * glyph inset into REI's button produced.
      */
-    private static final int ICON_SIZE = 10;
+    private static final ResourceLocation ICON =
+            ResourceLocation.fromNamespaceAndPath(JackItToMe.MODID, "textures/gui/jack_button.png");
 
-    /** Button size: icon plus a 2px margin so REI's frame shows around it. */
-    private static final int BUTTON_SIZE = ICON_SIZE + 6;
+    /** Sprite and button size in GUI units — blitted 1:1, never scaled. */
+    private static final int BUTTON_SIZE = 12;
 
-    /** Centres the icon inside {@link #BUTTON_SIZE}. */
-    private static final int ICON_INSET = (BUTTON_SIZE - ICON_SIZE) / 2;
+    /** Full sheet height: two stacked {@link #BUTTON_SIZE} state cells. */
+    private static final int SHEET_HEIGHT = BUTTON_SIZE * 2;
 
     @Override
     public DisplayCategoryView<T> provide(T display, DisplayCategory<T> category, DisplayCategoryView<T> lastView) {
@@ -60,7 +62,11 @@ public final class JackReiButtonExtension<T extends Display> implements Category
             }
 
             @Override
-            public List<Widget> setupDisplay(T d, Rectangle bounds) {
+            public List<Widget> setupDisplay(T d, Rectangle fullBounds) {
+                // The display was widened by the rei/mixin classes; hand the
+                // category the rectangle it would have had, so its layout is
+                // untouched and the strip on the left is ours.
+                Rectangle bounds = ReiButtonColumn.contentBounds(fullBounds);
                 List<Widget> widgets = new ArrayList<>(lastView.setupDisplay(d, bounds));
 
                 // Derive ingredients FROM the input slot widgets (in render
@@ -96,10 +102,22 @@ public final class JackReiButtonExtension<T extends Display> implements Category
                 if (ingredients.stream().allMatch(Ingredient::isEmpty)) {
                     return widgets; // no inputs to pull
                 }
+                // Disabled in the config, or no container behind the recipe view to
+                // pull from. REI rebuilds displays on open, so checking here is enough.
+                if (!nl.ljack2k.jackittome.client.PullTarget.shouldShowButton()) {
+                    return widgets;
+                }
 
-                int bx = bounds.getMaxX() - BUTTON_SIZE - 2;
-                int by = bounds.getMaxY() - BUTTON_SIZE - 2;
-                Rectangle buttonBounds = new Rectangle(bx, by, BUTTON_SIZE, BUTTON_SIZE);
+                // In the reserved strip, vertically centred — the same placement
+                // the EMI button uses, and immune to how tall the recipe is.
+                int baseX = fullBounds.x + 1;
+                int baseY = fullBounds.y + Math.max(0, (fullBounds.height - BUTTON_SIZE) / 2);
+
+                // REI fixes a widget's bounds when the display is built, but
+                // Rectangle is mutable and the button keeps this instance — so
+                // moving it each frame lets the placement offset apply live,
+                // with clicks following, instead of only after a reopen.
+                Rectangle buttonBounds = new Rectangle(baseX, baseY, BUTTON_SIZE, BUTTON_SIZE);
 
                 // The button (REI draws its native frame) fires the pull.
                 int results = resultsPerCraft;
@@ -111,9 +129,19 @@ public final class JackReiButtonExtension<T extends Display> implements Category
                 // shortage/craftable overlays, and queues the tooltip.
                 PullHoverPoller poller = new PullHoverPoller();
                 widgets.add(Widgets.createDrawableWidget((graphics, mouseX, mouseY, delta) -> {
-                    graphics.blit(ICON, bx + ICON_INSET, by + ICON_INSET, ICON_SIZE, ICON_SIZE, 0.0F, 0.0F, ICON_SIZE, ICON_SIZE, ICON_SIZE, ICON_SIZE);
+                    // Re-apply the configured offset before anything reads the
+                    // bounds, so drawing, hovering and clicking all agree.
+                    buttonBounds.x = baseX + ButtonPlacement.dx();
+                    buttonBounds.y = baseY + ButtonPlacement.dy();
+                    int bx = buttonBounds.x;
+                    int by = buttonBounds.y;
 
                     boolean hovered = buttonBounds.contains(mouseX, mouseY);
+                    // Hover swaps to the second cell of the sheet, as in EMI.
+                    graphics.blit(ICON, bx, by, BUTTON_SIZE, BUTTON_SIZE,
+                            0.0F, hovered ? BUTTON_SIZE : 0.0F,
+                            BUTTON_SIZE, BUTTON_SIZE, BUTTON_SIZE, SHEET_HEIGHT);
+
                     poller.tick(hovered, d, ingredients);
 
                     List<Boolean> shortages = AvailabilityCache.shortagesFor(d);
@@ -130,7 +158,10 @@ public final class JackReiButtonExtension<T extends Display> implements Category
                     }
 
                     if (hovered) {
-                        Tooltip.create(PullTooltipBuilder.build(d, ingredients, results)).queue();
+                        // Drawn to the LEFT by PullButtonTooltip; REI would open it
+                        // at the cursor, over the recipe and its shortage highlights.
+                        PullButtonTooltip.show(bx, by,
+                                PullTooltipBuilder.build(d, ingredients, results));
                     }
                 }));
                 return widgets;

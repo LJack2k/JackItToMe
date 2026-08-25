@@ -77,9 +77,13 @@ public final class PullTooltipBuilder {
         // Same modifier language as the pull keybinds: Shift = stack, Ctrl = max.
         // With a shortage, plain click only opens autocraft popups — say so and
         // name the (rebindable) override key that pulls in-stock items anyway.
+        // Kept to two short lines rather than one long one: the tooltip opens to
+        // the LEFT of the button, so its width eats into the recipe beside it.
         int inStock = total - totalMissing;
         if (shortages != null && inStock > 0 && totalMissing > 0) {
-            lines.add(Component.translatable("jackittome.button.recipe_pull.gate_hint",
+            lines.add(Component.translatable("jackittome.button.recipe_pull.gate_hint")
+                    .withStyle(ChatFormatting.DARK_GRAY, ChatFormatting.ITALIC));
+            lines.add(Component.translatable("jackittome.button.recipe_pull.override_hint",
                             KeyBindings.PULL_OVERRIDE.getTranslatedKeyMessage())
                     .withStyle(ChatFormatting.DARK_GRAY, ChatFormatting.ITALIC));
         }

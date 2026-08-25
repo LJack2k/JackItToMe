@@ -58,4 +58,14 @@ public interface RecipeViewerBridge {
     default boolean isSearchFocused() {
         return false;
     }
+
+    /**
+     * Whether this viewer's button honours {@code buttonOffsetX/Y}. True where we
+     * position the button ourselves (EMI, REI); false for JEI, which lays out its
+     * own recipe buttons and gives us no say. Gates the placement keys and their
+     * on-screen panel, so neither is offered where they would do nothing.
+     */
+    default boolean supportsButtonPlacement() {
+        return false;
+    }
 }

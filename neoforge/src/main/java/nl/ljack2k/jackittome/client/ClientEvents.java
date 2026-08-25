@@ -75,7 +75,7 @@ public final class ClientEvents {
         if (Screen.hasControlDown()
                 && JackConfig.PLACEMENT_KEYS.get()
                 && bridge().isRecipeScreen(event.getScreen())
-                && buttonIsShown()
+                && placementAvailable()
                 && !bridge().isSearchFocused()) {
             int ddx = 0, ddy = 0;
             switch (event.getKeyCode()) {
@@ -113,25 +113,29 @@ public final class ClientEvents {
     @SubscribeEvent
     public static void onScreenRender(ScreenEvent.Render.Post event) {
         JackAnimations.render(event.getGuiGraphics(), event.getScreen());
+        // Drawn after the viewer's own rendering, in screen space, so it can sit
+        // left of the button instead of at the cursor over the recipe.
+        PullButtonTooltip.render(event.getGuiGraphics(), event.getScreen());
 
         // Placement-mode panel — only where the button it repositions is actually
         // on screen. Offering to move a button that isn't there (hidden by config,
         // or because there is nothing to pull from) just reads as broken.
         Screen screen = event.getScreen();
-        if (screen != null && bridge().isRecipeScreen(screen) && buttonIsShown()) {
+        if (screen != null && bridge().isRecipeScreen(screen) && placementAvailable()) {
             PlacementOverlay.render(event.getGuiGraphics(), screen,
                     event.getMouseX(), event.getMouseY());
         }
     }
 
     /**
-     * Whether the recipe button is currently being drawn — the same two gates the
-     * placement code applies: the config toggle, and whether there is a container
-     * behind the recipe view worth pulling from.
+     * Whether the placement keys and their panel apply right now. The button has
+     * to be on screen — hidden by config, or by there being nothing to pull from,
+     * and there is nothing to move — AND the active viewer has to let us position
+     * it at all. JEI lays out its own recipe buttons, so offering the controls
+     * there would be offering something that cannot work.
      */
-    private static boolean buttonIsShown() {
-        return JackConfig.SHOW_RECIPE_BUTTON.get()
-                && PullTarget.isPullable(bridge().getHostContainerScreen());
+    private static boolean placementAvailable() {
+        return PullTarget.shouldShowButton() && bridge().supportsButtonPlacement();
     }
 
     /** Lets the placement overlay's buttons take a click before the viewer does. */

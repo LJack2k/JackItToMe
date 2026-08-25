@@ -1,12 +1,10 @@
-package nl.ljack2k.jackittome.emi.mixin;
+package nl.ljack2k.jackittome.mixin.emi;
 
 import nl.ljack2k.jackittome.JackItToMe;
-import nl.ljack2k.jackittome.client.JackConfig;
 import nl.ljack2k.jackittome.client.PullTarget;
 import nl.ljack2k.jackittome.emi.JackEmiButton;
 import nl.ljack2k.jackittome.emi.JackEmiButtonFactory;
 
-import dev.emi.emi.api.EmiApi;
 import dev.emi.emi.api.recipe.EmiRecipe;
 import dev.emi.emi.screen.RecipeDisplay;
 import dev.emi.emi.screen.WidgetGroup;
@@ -66,10 +64,9 @@ public abstract class RecipeDisplayMixin {
     @Inject(method = "<init>(Ldev/emi/emi/api/recipe/EmiRecipe;)V", at = @At("RETURN"))
     private void jackittome$reserveColumn(EmiRecipe recipe, CallbackInfo ci) {
         if (recipe == null || recipe.getInputs() == null || recipe.getInputs().isEmpty()) return;
-        if (!JackConfig.SHOW_RECIPE_BUTTON.get()) return;
         // Nothing to pull from behind the recipe view — don't reserve the column
         // either, so the panel keeps its normal width instead of showing a gap.
-        if (!PullTarget.isPullable(EmiApi.getHandledScreen())) return;
+        if (!PullTarget.shouldShowButton()) return;
 
         // Sit outside anything EMI already put in the left column, in the
         // unlikely event a future version uses it.
@@ -88,7 +85,7 @@ public abstract class RecipeDisplayMixin {
         try {
             // Vertically centred in the body, matching how EMI centres its own columns.
             int by = Math.max(0, (group.getHeight() - JackEmiButton.SIZE) / 2);
-            JackEmiButtonFactory.INSTANCE.decorate(group.recipe, group, jackittome$columnX, by);
+            JackEmiButtonFactory.INSTANCE.decorate(group.recipe, group, group.x, group.y, jackittome$columnX, by);
         } catch (Throwable t) {
             // A decoration failure must never take EMI's recipe screen down with it.
             JackItToMe.LOGGER.error("[JackItToMe] Failed to add the EMI pull button; "

@@ -116,4 +116,9 @@ public final class ReiViewerBridge implements RecipeViewerBridge {
         }
         return null;
     }
+
+    @Override
+    public boolean supportsButtonPlacement() {
+        return true;   // we place this viewer's button ourselves
+    }
 }

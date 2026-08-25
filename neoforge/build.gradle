@@ -219,7 +219,10 @@ dependencies {
     }
 
     // ---- REI (optional recipe viewer) ----
-    compileOnly "me.shedaniel:RoughlyEnoughItems-api-neoforge:${rei_version}"
+    // The FULL jar, not the api artifact: the rei/mixin classes target
+    // me.shedaniel.rei.impl.client.gui.screen.*, which the api jar does not carry.
+    // Still compileOnly, and REI stays an optional runtime dep.
+    compileOnly "me.shedaniel:RoughlyEnoughItems-neoforge:${rei_version}"
     if (recipeViewer == 'rei') {
         runtimeOnly "me.shedaniel:RoughlyEnoughItems-neoforge:${rei_version}"
     }

@@ -103,4 +103,9 @@ public final class EmiViewerBridge implements RecipeViewerBridge {
             return false;
         }
     }
+
+    @Override
+    public boolean supportsButtonPlacement() {
+        return true;   // we place this viewer's button ourselves
+    }
 }
