@@ -14,7 +14,7 @@ import java.util.List;
 /**
  * Conversion helpers between EMI's stack/ingredient types and vanilla
  * {@link ItemStack} / {@link Ingredient}. Shared by {@link EmiViewerBridge}
- * (P-key hover) and {@link JackEmiRecipeDecorator} (recipe pull button).
+ * (P-key hover) and {@link JackEmiButtonFactory} (recipe pull button).
  */
 final class EmiStacks {
     private EmiStacks() {}

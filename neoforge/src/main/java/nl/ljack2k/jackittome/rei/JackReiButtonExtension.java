@@ -37,7 +37,19 @@ import java.util.List;
 public final class JackReiButtonExtension<T extends Display> implements CategoryExtensionProvider<T> {
 
     private static final ResourceLocation ICON =
-            ResourceLocation.fromNamespaceAndPath(JackItToMe.MODID, "textures/gui/jack_button.png");
+            ResourceLocation.fromNamespaceAndPath(JackItToMe.MODID, "textures/gui/jack_icon.png");
+
+    /**
+     * The icon texture's native size in GUI units — blitted 1:1, never scaled.
+     * Keep in sync with the PNG and with {@code JackEmiButton.ICON_SIZE}.
+     */
+    private static final int ICON_SIZE = 10;
+
+    /** Button size: icon plus a 2px margin so REI's frame shows around it. */
+    private static final int BUTTON_SIZE = ICON_SIZE + 6;
+
+    /** Centres the icon inside {@link #BUTTON_SIZE}. */
+    private static final int ICON_INSET = (BUTTON_SIZE - ICON_SIZE) / 2;
 
     @Override
     public DisplayCategoryView<T> provide(T display, DisplayCategory<T> category, DisplayCategoryView<T> lastView) {
@@ -85,9 +97,9 @@ public final class JackReiButtonExtension<T extends Display> implements Category
                     return widgets; // no inputs to pull
                 }
 
-                int bx = bounds.getMaxX() - 18;
-                int by = bounds.getMaxY() - 18;
-                Rectangle buttonBounds = new Rectangle(bx, by, 16, 16);
+                int bx = bounds.getMaxX() - BUTTON_SIZE - 2;
+                int by = bounds.getMaxY() - BUTTON_SIZE - 2;
+                Rectangle buttonBounds = new Rectangle(bx, by, BUTTON_SIZE, BUTTON_SIZE);
 
                 // The button (REI draws its native frame) fires the pull.
                 int results = resultsPerCraft;
@@ -99,7 +111,7 @@ public final class JackReiButtonExtension<T extends Display> implements Category
                 // shortage/craftable overlays, and queues the tooltip.
                 PullHoverPoller poller = new PullHoverPoller();
                 widgets.add(Widgets.createDrawableWidget((graphics, mouseX, mouseY, delta) -> {
-                    graphics.blit(ICON, bx + 2, by + 2, 12, 12, 0.0F, 0.0F, 16, 16, 16, 16);
+                    graphics.blit(ICON, bx + ICON_INSET, by + ICON_INSET, ICON_SIZE, ICON_SIZE, 0.0F, 0.0F, ICON_SIZE, ICON_SIZE, ICON_SIZE, ICON_SIZE);
 
                     boolean hovered = buttonBounds.contains(mouseX, mouseY);
                     poller.tick(hovered, d, ingredients);

@@ -21,10 +21,11 @@
 libs/*.jar
 
 # PNGs derived from SVGs at build time by the rasterizeIcons Gradle task.
-# The SVG masters are the source of truth; the PNGs regenerate on every build.
+# The SVG masters are the source of truth; these PNGs regenerate on every build.
 **/src/main/resources/icon.png
 **/src/main/resources/icon-transparent.png
-**/src/main/resources/assets/jackittome/textures/gui/jack_button.png
+# NOTE: jack_button.png is NOT listed here on purpose. It is hand-drawn pixel art
+# and a committed source file — see the iconMappings note in neoforge/build.gradle.
 
 # This handover doc — delete after the restructure is complete.
 RESTRUCTURE-PLAN.md

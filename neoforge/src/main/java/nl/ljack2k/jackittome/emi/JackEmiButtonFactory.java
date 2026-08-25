@@ -4,7 +4,6 @@ import nl.ljack2k.jackittome.JackItToMe;
 import nl.ljack2k.jackittome.client.PullTooltipBuilder;
 
 import dev.emi.emi.api.recipe.EmiRecipe;
-import dev.emi.emi.api.recipe.EmiRecipeDecorator;
 import dev.emi.emi.api.widget.WidgetHolder;
 
 import net.minecraft.client.gui.screens.inventory.tooltip.ClientTooltipComponent;
@@ -15,30 +14,35 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Adds the JackItToMe pull button to every EMI recipe display. EMI invokes
- * {@link #decorateRecipe} once per recipe layout (any category), so a single
- * generic decorator gives us the universal button — the EMI equivalent of
- * JEI's {@code IRecipeButtonControllerFactory}.
+ * Builds the JackItToMe pull button for an EMI recipe display.
+ * <p>
+ * This is NOT an {@code EmiRecipeDecorator}. EMI's decorator API is gated behind
+ * its {@code show-recipe-decorators} setting, which ships disabled, and it can
+ * only draw inside the recipe body — where short layouts (anvil, fuel) leave no
+ * room. {@code RecipeDisplayMixin} therefore reserves a column beside the recipe
+ * and calls {@link #decorate} to fill it, so the button is always present and
+ * always in the same place.
  * <p>
  * The button carries a dynamic tooltip showing in-stock/craftable counts (the
- * same text JEI/REI show). EMI doesn't expose recipe slot positions to
- * decorators, so the per-slot shortage overlays the JEI/REI versions draw are
- * not available here — only the tooltip.
+ * same text JEI/REI show). EMI doesn't expose recipe slot positions to us, so
+ * the per-slot shortage overlays the JEI/REI versions draw are not available
+ * here — only the tooltip.
  */
-public final class JackEmiRecipeDecorator implements EmiRecipeDecorator {
+public final class JackEmiButtonFactory {
 
-    @Override
-    public void decorateRecipe(EmiRecipe recipe, WidgetHolder widgets) {
+    /** Shared instance; {@code RecipeDisplayMixin} is the only caller. */
+    public static final JackEmiButtonFactory INSTANCE = new JackEmiButtonFactory();
+
+    /**
+     * Adds the button and its tooltip at a group-relative position, chosen by
+     * {@code RecipeDisplayMixin} to sit in the column it reserved beside the
+     * recipe body.
+     */
+    public void decorate(EmiRecipe recipe, WidgetHolder widgets, int x, int y) {
         List<Ingredient> ingredients = EmiStacks.inputIngredients(recipe);
         if (ingredients.stream().allMatch(Ingredient::isEmpty)) {
             return; // output-only display (e.g. info recipes) — nothing to pull.
         }
-
-        // Bottom-right corner of the recipe display (relative to the recipe
-        // origin). Clearer than the top-right, which crowds EMI's rounded panel
-        // corner. Recipe layouts vary, so this is a best-effort universal spot.
-        int x = widgets.getWidth() - 16;
-        int y = widgets.getHeight() - 16;
 
         widgets.add(new JackEmiButton(x, y, recipe, ingredients,
                 (mouseX, mouseY, button) -> sendPull(recipe, ingredients)));
@@ -51,7 +55,7 @@ public final class JackEmiRecipeDecorator implements EmiRecipeDecorator {
                 out.add(ClientTooltipComponent.create(line.getVisualOrderText()));
             }
             return out;
-        }, x, y, 16, 16);
+        }, x, y, JackEmiButton.SIZE, JackEmiButton.SIZE);
     }
 
     private static void sendPull(EmiRecipe recipe, List<Ingredient> ingredients) {

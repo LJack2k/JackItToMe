@@ -1,0 +1,13 @@
+{
+  "required": false,
+  "minVersion": "0.8.5",
+  "package": "nl.ljack2k.jackittome.emi.mixin",
+  "plugin": "nl.ljack2k.jackittome.emi.mixin.EmiMixinPlugin",
+  "compatibilityLevel": "JAVA_21",
+  "client": [
+    "RecipeDisplayMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 0
+  }
+}

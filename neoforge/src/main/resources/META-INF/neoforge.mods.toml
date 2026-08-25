@@ -17,6 +17,12 @@ logoFile = "icon.png"
 # logoBlur = true is fine for a smooth/rendered icon. Set false for pixel-art.
 logoBlur = true
 
+# Client-only mixins, all EMI-targeting. The config's plugin skips them entirely
+# when EMI is absent, so JEI/REI/no-viewer users never load them — see
+# EmiMixinPlugin for why EMI's own setting makes this necessary.
+[[mixins]]
+config = "jackittome.mixins.json"
+
 # --- Required ---
 [[dependencies.${mod_id}]]
 modId = "neoforge"

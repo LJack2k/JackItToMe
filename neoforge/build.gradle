@@ -209,7 +209,11 @@ dependencies {
     }
 
     // ---- EMI (optional recipe viewer) ----
-    compileOnly "dev.emi:emi-neoforge:${emi_version}:api"
+    // NOTE: the FULL jar, not the ':api' classifier. RecipeDisplayMixin targets
+    // dev.emi.emi.screen.RecipeDisplay / WidgetGroup and reads EmiConfig, none of
+    // which ship in the api artifact. Still compileOnly — nothing is bundled, and
+    // EMI stays an optional runtime dep.
+    compileOnly "dev.emi:emi-neoforge:${emi_version}"
     if (recipeViewer == 'emi') {
         runtimeOnly "dev.emi:emi-neoforge:${emi_version}"
     }
@@ -235,9 +239,12 @@ def iconMappings = [
     [src: 'src/main/resources/icon.svg',
      dst: 'src/main/resources/icon.png',
      w: 256, h: 256],
-    [src: 'src/main/resources/icon-transparent.svg',
-     dst: 'src/main/resources/assets/jackittome/textures/gui/jack_button.png',
-     w: 16, h: 16],
+    // NOTE: jack_button.png is deliberately NOT generated here any more. It is
+    // hand-drawn pixel art (12x12, authored to blit 1:1 — see JackEmiButton.ICON_SIZE)
+    // and is now a committed source file. Rasterizing it from icon-transparent.svg
+    // anti-aliased the edges and forced a 16x16 size, and every build silently
+    // overwrote the artwork. icon-transparent.svg is kept only as the historical
+    // master for the old icon.
 ]
 
 tasks.register('rasterizeIcons') {

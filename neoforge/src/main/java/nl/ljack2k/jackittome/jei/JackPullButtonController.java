@@ -44,25 +44,31 @@ import java.util.List;
 public class JackPullButtonController implements IIconButtonController {
 
     /**
-     * Path to the custom button icon, relative to {@code src/main/resources/assets/jackittome/}.
-     * The file at {@code assets/jackittome/textures/gui/jack_button.png} is read as
-     * a 16×16 region — JEI's standard side-button icon size.
+     * The BORDERLESS glyph — JEI draws its own button frame around whatever icon
+     * we hand it, so this must not carry a painted border of its own (unlike
+     * {@code jack_button.png}, which EMI needs because EMI supplies no chrome).
      */
     private static final ResourceLocation ICON_TEXTURE =
-            ResourceLocation.fromNamespaceAndPath(JackItToMe.MODID, "textures/gui/jack_button.png");
+            ResourceLocation.fromNamespaceAndPath(JackItToMe.MODID, "textures/gui/jack_icon.png");
+
+    /**
+     * The glyph's native size in GUI units. Drawing it at any other size
+     * resamples it and destroys the pixel art — keep in sync with the PNG.
+     */
+    private static final int ICON_SIZE = 10;
 
     private final IRecipeLayoutDrawable<?> layoutDrawable;
     private final IDrawable icon;
 
     public JackPullButtonController(IRecipeLayoutDrawable<?> layoutDrawable, IJeiHelpers helpers) {
         this.layoutDrawable = layoutDrawable;
-        // 16x16 region starting at (0,0). Critical: setTextureSize(16, 16) tells
-        // JEI the file is actually 16x16 — without this it assumes the standard
+        // Full-texture region starting at (0,0). Critical: setTextureSize tells JEI
+        // the file's real dimensions — without this it assumes the standard
         // Minecraft atlas size (256x256) and ends up sampling only a tiny corner
         // of our texture, resulting in a blank-looking button.
         this.icon = helpers.getGuiHelper()
-                .drawableBuilder(ICON_TEXTURE, 0, 0, 16, 16)
-                .setTextureSize(16, 16)
+                .drawableBuilder(ICON_TEXTURE, 0, 0, ICON_SIZE, ICON_SIZE)
+                .setTextureSize(ICON_SIZE, ICON_SIZE)
                 .build();
     }
 
