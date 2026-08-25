@@ -1,6 +1,6 @@
 package nl.ljack2k.jackittome;
 
-import nl.ljack2k.jackittome.client.ClientEvents;
+import nl.ljack2k.jackittome.client.ClientSetup;
 import nl.ljack2k.jackittome.compat.ae2.Ae2ItemSource;
 import nl.ljack2k.jackittome.compat.id.IntegratedDynamicsItemSource;
 import nl.ljack2k.jackittome.compat.rs.RsItemSource;
@@ -10,7 +10,7 @@ import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.ModList;
 import net.neoforged.fml.common.Mod;
-import net.neoforged.neoforge.common.NeoForge;
+import net.neoforged.fml.ModContainer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -25,7 +25,7 @@ public final class JackItToMe {
     public static final String MODID = "jackittome";
     public static final Logger LOGGER = LoggerFactory.getLogger(MODID);
 
-    public JackItToMe(IEventBus modBus, Dist dist) {
+    public JackItToMe(IEventBus modBus, ModContainer container, Dist dist) {
         // Packet registration is a mod-bus event in NeoForge 1.21.
         modBus.addListener(ModPackets::register);
 
@@ -52,9 +52,9 @@ public final class JackItToMe {
             IntegratedDynamicsItemSource.register();
         }
 
-        // Client-only setup.
+        // Client-only setup — isolated so the server never touches client classes.
         if (dist.isClient()) {
-            NeoForge.EVENT_BUS.register(ClientEvents.class);
+            ClientSetup.init(modBus, container);
         }
     }
 }

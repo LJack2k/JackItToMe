@@ -94,4 +94,13 @@ public final class EmiViewerBridge implements RecipeViewerBridge {
         }
         return ItemStack.EMPTY;
     }
+
+    @Override
+    public boolean isSearchFocused() {
+        try {
+            return dev.emi.emi.api.EmiApi.isSearchFocused();
+        } catch (Throwable t) {
+            return false;
+        }
+    }
 }

@@ -48,4 +48,14 @@ public interface RecipeViewerBridge {
     default AbstractContainerScreen<?> getHostContainerScreen() {
         return null;
     }
+
+    /**
+     * True when the viewer's own search box currently has keyboard focus. The
+     * button-placement keys check this so they never steal keystrokes (notably
+     * Ctrl+Left/Right, which is word-jump) from someone typing a search.
+     * Default: {@code false} for viewers with no search box we can query.
+     */
+    default boolean isSearchFocused() {
+        return false;
+    }
 }

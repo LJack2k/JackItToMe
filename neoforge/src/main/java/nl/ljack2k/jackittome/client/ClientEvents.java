@@ -11,7 +11,9 @@ import com.mojang.blaze3d.platform.InputConstants;
 import com.mojang.blaze3d.platform.Window;
 
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.network.chat.Component;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
@@ -67,6 +69,30 @@ public final class ClientEvents {
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null) return;
 
+        // Ctrl + arrows reposition the recipe button (Ctrl+Home resets). Only on a
+        // recipe screen, and never while the viewer's search box has focus — there
+        // Ctrl+Left/Right is word-jump and stealing it would be maddening.
+        if (Screen.hasControlDown()
+                && JackConfig.PLACEMENT_KEYS.get()
+                && bridge().isRecipeScreen(event.getScreen())
+                && buttonIsShown()
+                && !bridge().isSearchFocused()) {
+            int ddx = 0, ddy = 0;
+            switch (event.getKeyCode()) {
+                case InputConstants.KEY_LEFT  -> ddx = -1;
+                case InputConstants.KEY_RIGHT -> ddx = 1;
+                case InputConstants.KEY_UP    -> ddy = -1;
+                case InputConstants.KEY_DOWN  -> ddy = 1;
+                case InputConstants.KEY_HOME  -> { ButtonPlacement.reset(); event.setCanceled(true); return; }
+                default -> { }
+            }
+            if (ddx != 0 || ddy != 0) {
+                ButtonPlacement.nudge(ddx, ddy);
+                event.setCanceled(true);
+                return;
+            }
+        }
+
         // Most specific first: with the default layout all three share the
         // physical G key and differ only in KeyModifier, and NONE-modifier
         // binds also match while a modifier is held — so checking MAX before
@@ -87,6 +113,35 @@ public final class ClientEvents {
     @SubscribeEvent
     public static void onScreenRender(ScreenEvent.Render.Post event) {
         JackAnimations.render(event.getGuiGraphics(), event.getScreen());
+
+        // Placement-mode panel — only where the button it repositions is actually
+        // on screen. Offering to move a button that isn't there (hidden by config,
+        // or because there is nothing to pull from) just reads as broken.
+        Screen screen = event.getScreen();
+        if (screen != null && bridge().isRecipeScreen(screen) && buttonIsShown()) {
+            PlacementOverlay.render(event.getGuiGraphics(), screen,
+                    event.getMouseX(), event.getMouseY());
+        }
+    }
+
+    /**
+     * Whether the recipe button is currently being drawn — the same two gates the
+     * placement code applies: the config toggle, and whether there is a container
+     * behind the recipe view worth pulling from.
+     */
+    private static boolean buttonIsShown() {
+        return JackConfig.SHOW_RECIPE_BUTTON.get()
+                && PullTarget.isPullable(bridge().getHostContainerScreen());
+    }
+
+    /** Lets the placement overlay's buttons take a click before the viewer does. */
+    @SubscribeEvent
+    public static void onScreenClick(ScreenEvent.MouseButtonPressed.Pre event) {
+        Screen screen = event.getScreen();
+        if (screen == null || !bridge().isRecipeScreen(screen)) return;
+        if (PlacementOverlay.mouseClicked(event.getMouseX(), event.getMouseY())) {
+            event.setCanceled(true);
+        }
     }
 
     // ---- Screen close ---------------------------------------------------
