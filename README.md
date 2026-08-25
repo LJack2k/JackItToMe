@@ -107,6 +107,9 @@ Install any **one** of these (or none). The mod adapts to whichever it finds:
 | **REI** | ✅ | ✅ | ✅ |
 | **EMI** | ✅ | ✅ | — (counts shown in the tooltip instead) |
 
+The button only appears when there's something to pull from — open a recipe
+with just your own inventory behind it and it stays out of the way.
+
 Without any viewer installed the mod still works for the **G** keybind on
 vanilla container slots — you just won't get the recipe button or the ability
 to pull from a viewer's item list.
@@ -150,7 +153,16 @@ Rebind the pull keybinds from **Options → Controls → JackItToMe**:
 *Jack hovered item* (G), *Jack a full stack* (Shift+G), *Jack as much as
 fits* (Ctrl+G), and *Pull in-stock override* (hold Alt while clicking the
 recipe button). Defaults changed from **P** in 0.7.0 — new installs only;
-an existing rebind is kept. No other configuration needed.
+an existing rebind is kept.
+
+Everything else is optional, under **Mods → JackItToMe → Config** (or
+`config/jackittome-client.toml`):
+
+| Option | Default | What it does |
+| ------ | :-----: | ------------ |
+| `showRecipeButton` | `true` | Show the jack button on recipes at all. Off leaves the keybinds working. |
+| `buttonOffsetX` / `buttonOffsetY` | `0` | Nudge the button, in GUI pixels, from its default spot. |
+| `placementKeys` | `false` | Turn on to reposition the button in-game: open a recipe, then **Ctrl + arrow keys** to move it and **Ctrl+Home** to reset. Each nudge is saved, so you can switch this back off when it looks right. |
 
 Heads-up for AE2 users: AE2's guide (GuideMe) uses **hold-G** to open the
 guide for the hovered item. A tap pulls, a hold opens the guide, so the two
