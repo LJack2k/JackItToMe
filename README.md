@@ -161,8 +161,12 @@ Everything else is optional, under **Mods → JackItToMe → Config** (or
 | Option | Default | What it does |
 | ------ | :-----: | ------------ |
 | `showRecipeButton` | `true` | Show the jack button on recipes at all. Off leaves the keybinds working. |
-| `buttonOffsetX` / `buttonOffsetY` | `0` | Nudge the button, in GUI pixels, from its default spot. |
-| `placementKeys` | `false` | Turn on to reposition the button in-game: open a recipe, then **Ctrl + arrow keys** to move it and **Ctrl+Home** to reset. Each nudge is saved, so you can switch this back off when it looks right. |
+| `buttonOffsetX` / `buttonOffsetY` | `0` | Nudge the button, in GUI pixels, from its default spot. **EMI and REI only.** |
+| `placementKeys` | `false` | Turn on to reposition the button in-game: open a recipe, then **Ctrl + arrow keys** to move it and **Ctrl+Home** to reset. Each nudge is saved, so you can switch this back off when it looks right. **EMI and REI only.** |
+
+Under EMI and REI the button gets its own spot beside each recipe, which is
+what the offsets move. JEI places its own recipe buttons, so those two options
+and the placement keys don't apply there — they're hidden rather than inert.
 
 Heads-up for AE2 users: AE2's guide (GuideMe) uses **hold-G** to open the
 guide for the hovered item. A tap pulls, a hold opens the guide, so the two
