@@ -16,12 +16,12 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Release tag to publish (e.g. v0.4.1)'
+        description: 'Release tag to publish (e.g. v1.0.0-mc1.21.1)'
         required: true
         type: string
 
 permissions:
-  contents: read    # for `gh release download` to read the release asset
+  contents: read    # for `gh release download` and the source checkout
 
 jobs:
   publish:
@@ -29,8 +29,8 @@ jobs:
     # Gate workflow_run on success + tag-shaped head_branch. workflow_dispatch
     # is always allowed through (manual re-runs need to work even when the
     # last release failed). head_branch on a tag-triggered upstream is the
-    # tag name itself (e.g. "v0.4.1") — sanity-check it starts with 'v' to
-    # rule out accidental triggers from non-release contexts.
+    # tag name itself — sanity-check it starts with 'v' to rule out
+    # accidental triggers from non-release contexts.
     if: ${{ github.event_name == 'workflow_dispatch' ||
             (github.event.workflow_run.conclusion == 'success' &&
              startsWith(github.event.workflow_run.head_branch, 'v')) }}
@@ -38,12 +38,27 @@ jobs:
       - name: Resolve tag
         id: tag
         # Tag source depends on trigger:
-        #   - workflow_run     → github.event.workflow_run.head_branch (e.g. "v0.4.1")
+        #   - workflow_run      → github.event.workflow_run.head_branch
         #   - workflow_dispatch → inputs.tag
         run: |
           TAG="${{ inputs.tag || github.event.workflow_run.head_branch }}"
-          echo "tag=$TAG"          >> "$GITHUB_OUTPUT"
-          echo "version=${TAG#v}"  >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+      # Check out the TAGGED commit, so gradle.properties describes the MC line
+      # being published rather than whatever the default branch holds. This is
+      # what lets one workflow serve every line (1.21.1, 26.1, ...).
+      - name: Checkout the tagged commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.tag.outputs.tag }}
+
+      - name: Read build properties
+        id: props
+        run: |
+          echo "mc=$(grep -E '^minecraft_version=' gradle.properties | cut -d= -f2)" >> "$GITHUB_OUTPUT"
+          echo "java=$(grep -E '^java_version=' gradle.properties | cut -d= -f2)" >> "$GITHUB_OUTPUT"
+          echo "modver=$(grep -E '^mod_version=' gradle.properties | cut -d= -f2)" >> "$GITHUB_OUTPUT"
+          echo "loaders=$(grep -E '^mod_loaders=' gradle.properties | cut -d= -f2)" >> "$GITHUB_OUTPUT"
 
       - name: Download jar from GitHub Release
         env:
@@ -67,13 +82,14 @@ jobs:
 
           files: dist/*.jar
 
-          name: JackItToMe-neoforge-1.21.1-${{ steps.tag.outputs.version }}.jar
-          version: ${{ steps.tag.outputs.version }}
+          name: JackItToMe-${{ steps.props.outputs.loaders }}-${{ steps.props.outputs.mc }}-${{ steps.props.outputs.modver }}.jar
+          # +<mc> build metadata keeps the version unique per MC line.
+          version: "${{ steps.props.outputs.modver }}+${{ steps.props.outputs.mc }}"
           version-type: release
 
-          loaders: neoforge
-          game-versions: 1.21.1
-          java: 21
+          loaders: ${{ steps.props.outputs.loaders }}
+          game-versions: ${{ steps.props.outputs.mc }}
+          java: ${{ steps.props.outputs.java }}
 
           # CurseForge-only dependency entries — Modrinth slugs live in
           # publish-modrinth.yml. mc-publish ignores curly-brace pairs for
@@ -89,5 +105,6 @@ jobs:
             applied-energistics-2(optional){curseforge:223794}
             refined-storage(optional){curseforge:243076}
 
-          changelog: |
-            See the [release notes on GitHub](https://github.com/${{ github.repository }}/releases/tag/${{ steps.tag.outputs.tag }}).
+          # The same notes the GitHub Release uses, read from the commit checked
+          # out above, so every platform shows identical text.
+          changelog-file: changelogs/${{ steps.props.outputs.modver }}.md

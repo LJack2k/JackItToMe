@@ -21,7 +21,9 @@ version = mod_version
 group = mod_group_id
 
 java {
-    toolchain.languageVersion = JavaLanguageVersion.of(21)
+    // Single source of truth: java_version in gradle.properties, which the release
+    // workflows read too, so one MC line never builds against another's Java.
+    toolchain.languageVersion = JavaLanguageVersion.of(Integer.parseInt(java_version))
     withSourcesJar()
 }
 
