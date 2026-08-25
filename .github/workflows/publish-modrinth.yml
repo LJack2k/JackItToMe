@@ -35,7 +35,7 @@ jobs:
       # being published rather than whatever the default branch holds. This is
       # what lets one workflow serve every line (1.21.1, 26.1, ...).
       - name: Checkout the tagged commit
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           ref: ${{ steps.tag.outputs.tag }}
 
