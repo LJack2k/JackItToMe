@@ -7,9 +7,8 @@ import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.world.item.crafting.Ingredient;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 
 import java.util.List;
@@ -24,14 +23,14 @@ import java.util.List;
  * response to the exact hover that triggered it — if the user mouses over a
  * different button before the response arrives, we ignore the stale data.
  */
-public record CheckAvailabilityPayload(long nonce, List<Ingredient> ingredients) implements CustomPacketPayload {
+public record CheckAvailabilityPayload(long nonce, List<IngredientRequest> ingredients) implements CustomPacketPayload {
 
     public static final Type<CheckAvailabilityPayload> TYPE =
-            new Type<>(ResourceLocation.fromNamespaceAndPath(JackItToMe.MODID, "check_availability"));
+            new Type<>(Identifier.fromNamespaceAndPath(JackItToMe.MODID, "check_availability"));
 
     public static final StreamCodec<RegistryFriendlyByteBuf, CheckAvailabilityPayload> STREAM_CODEC = StreamCodec.composite(
             ByteBufCodecs.VAR_LONG,                                           CheckAvailabilityPayload::nonce,
-            Ingredient.CONTENTS_STREAM_CODEC.apply(ByteBufCodecs.list()),     CheckAvailabilityPayload::ingredients,
+            IngredientRequest.LIST_STREAM_CODEC,                              CheckAvailabilityPayload::ingredients,
             CheckAvailabilityPayload::new
     );
 

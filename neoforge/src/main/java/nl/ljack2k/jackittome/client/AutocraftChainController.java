@@ -9,7 +9,7 @@ import net.minecraft.world.item.ItemStack;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.event.ScreenEvent;
-import net.neoforged.neoforge.network.PacketDistributor;
+import net.neoforged.neoforge.client.network.ClientPacketDistributor;
 
 import java.util.ArrayDeque;
 import java.util.Deque;
@@ -81,7 +81,7 @@ public final class AutocraftChainController {
         firstFired = true;
         JackItToMe.LOGGER.info("[JackItToMe] Chain: requesting autocraft popup for {} ({} left in queue)",
                 next.getHoverName().getString(), PENDING.size());
-        PacketDistributor.sendToServer(new RequestAutocraftPayload(next));
+        ClientPacketDistributor.sendToServer(new RequestAutocraftPayload(next));
     }
 
     /**
@@ -101,7 +101,7 @@ public final class AutocraftChainController {
         if (wasPopup && !nextIsPopup && !PENDING.isEmpty()) {
             // Defer one tick so the open transition fully settles before we
             // open the next popup over it.
-            Minecraft.getInstance().tell(AutocraftChainController::fireNext);
+            Minecraft.getInstance().execute(AutocraftChainController::fireNext);
         }
     }
 
@@ -119,7 +119,7 @@ public final class AutocraftChainController {
         // Defer a couple ticks — the popup-flow successor (e.g. CraftConfirm)
         // might still be incoming. If by then no popup is open, advance.
         Minecraft mc = Minecraft.getInstance();
-        mc.tell(() -> mc.tell(() -> {
+        mc.execute(() -> mc.execute(() -> {
             if (!isPopupScreen(mc.screen) && !PENDING.isEmpty()) {
                 inPopupFlow = false;
                 fireNext();

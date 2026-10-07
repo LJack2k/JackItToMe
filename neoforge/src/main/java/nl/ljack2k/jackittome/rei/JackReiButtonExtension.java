@@ -19,10 +19,11 @@ import me.shedaniel.rei.api.client.registry.display.DisplayCategoryView;
 import me.shedaniel.rei.api.common.display.Display;
 import me.shedaniel.rei.api.common.entry.EntryStack;
 
+import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.crafting.Ingredient;
+import nl.ljack2k.jackittome.network.IngredientRequest;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -44,8 +45,8 @@ public final class JackReiButtonExtension<T extends Display> implements Category
      * button-sized, which avoids the frame-inside-a-frame look that a borderless
      * glyph inset into REI's button produced.
      */
-    private static final ResourceLocation ICON =
-            ResourceLocation.fromNamespaceAndPath(JackItToMe.MODID, "textures/gui/jack_button.png");
+    private static final Identifier ICON =
+            Identifier.fromNamespaceAndPath(JackItToMe.MODID, "textures/gui/jack_button.png");
 
     /** Sprite and button size in GUI units — blitted 1:1, never scaled. */
     private static final int BUTTON_SIZE = 12;
@@ -74,7 +75,7 @@ public final class JackReiButtonExtension<T extends Display> implements Category
                 // index, the availability request, and the slot positions all
                 // line up 1:1 — categories don't always order the two the same.
                 List<Rectangle> inputSlotBounds = new ArrayList<>();
-                List<Ingredient> ingredients = new ArrayList<>();
+                List<IngredientRequest> ingredients = new ArrayList<>();
                 int resultsPerCraft = 1;
                 for (Widget w : widgets) {
                     if (w instanceof Slot slot && slot.getNoticeMark() == Slot.INPUT) {
@@ -84,8 +85,11 @@ public final class JackReiButtonExtension<T extends Display> implements Category
                             ItemStack is = ReiDisplays.toItemStack(entry);
                             if (!is.isEmpty()) stacks.add(is);
                         }
-                        ingredients.add(stacks.isEmpty() ? Ingredient.EMPTY
-                                : Ingredient.of(stacks.toArray(ItemStack[]::new)));
+                        // Every variant of one slot shows the same count - the
+                        // recipe's per-slot amount - so the first one speaks for it.
+                        ingredients.add(stacks.isEmpty()
+                                ? IngredientRequest.EMPTY
+                                : IngredientRequest.of(stacks.getFirst().getCount(), stacks));
                     } else if (w instanceof Slot slot && slot.getNoticeMark() == Slot.OUTPUT
                             && resultsPerCraft == 1) {
                         // First output slot's count drives STACK mode's
@@ -99,7 +103,7 @@ public final class JackReiButtonExtension<T extends Display> implements Category
                         }
                     }
                 }
-                if (ingredients.stream().allMatch(Ingredient::isEmpty)) {
+                if (ingredients.stream().allMatch(IngredientRequest::isEmpty)) {
                     return widgets; // no inputs to pull
                 }
                 // Disabled in the config, or no container behind the recipe view to
@@ -137,8 +141,8 @@ public final class JackReiButtonExtension<T extends Display> implements Category
                     int by = buttonBounds.y;
 
                     boolean hovered = buttonBounds.contains(mouseX, mouseY);
-                    // Hover swaps to the second cell of the sheet, as in EMI.
-                    graphics.blit(ICON, bx, by, BUTTON_SIZE, BUTTON_SIZE,
+                    // Hover swaps to the second cell of the sheet.
+                    graphics.blit(RenderPipelines.GUI_TEXTURED, ICON, bx, by,
                             0.0F, hovered ? BUTTON_SIZE : 0.0F,
                             BUTTON_SIZE, BUTTON_SIZE, BUTTON_SIZE, SHEET_HEIGHT);
 

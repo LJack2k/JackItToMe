@@ -6,13 +6,13 @@ import me.shedaniel.rei.api.common.entry.EntryStack;
 import me.shedaniel.rei.api.common.entry.type.VanillaEntryTypes;
 
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.crafting.Ingredient;
+import nl.ljack2k.jackittome.network.IngredientRequest;
 
 import java.util.List;
 
 /**
  * Conversion helpers between REI's {@link EntryStack} type and vanilla
- * {@link ItemStack}/{@link Ingredient}, plus the pull dispatch. Shared by
+ * {@link ItemStack}/{@link IngredientRequest}, plus the pull dispatch. Shared by
  * {@link ReiViewerBridge}
  * (P-key hover) and {@link JackReiButtonExtension} (recipe pull button).
  */
@@ -38,7 +38,7 @@ final class ReiDisplays {
      * Send the pull payload for the given input ingredients (built by the
      * button extension from the recipe's input slots, in slot order).
      */
-    static void sendPull(List<Ingredient> ingredients, int resultsPerCraft) {
+    static void sendPull(List<IngredientRequest> ingredients, int resultsPerCraft) {
         // Modifier → mode mapping is shared across viewers in PullButtonClick.
         nl.ljack2k.jackittome.client.PullButtonClick.send("REI", ingredients, resultsPerCraft, false);
     }

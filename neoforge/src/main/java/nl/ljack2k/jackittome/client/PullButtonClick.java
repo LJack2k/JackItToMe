@@ -1,18 +1,21 @@
 package nl.ljack2k.jackittome.client;
 
 import nl.ljack2k.jackittome.JackItToMe;
+import nl.ljack2k.jackittome.network.IngredientRequest;
 import nl.ljack2k.jackittome.network.PullIngredientsPayload;
 import nl.ljack2k.jackittome.network.PullMode;
 
-import net.minecraft.client.gui.screens.Screen;
-import net.minecraft.world.item.crafting.Ingredient;
-import net.neoforged.neoforge.network.PacketDistributor;
+import com.mojang.blaze3d.platform.InputConstants;
+import com.mojang.blaze3d.platform.Window;
+import net.minecraft.client.Minecraft;
+import net.neoforged.neoforge.client.network.ClientPacketDistributor;
+import org.lwjgl.glfw.GLFW;
 
 import java.util.List;
 
 /**
- * Shared click handling for the per-recipe pull button, so JEI, EMI, and REI
- * all map modifiers to the same payload — and the quantity mapping matches
+ * Shared click handling for the per-recipe pull button, so JEI and REI
+ * both map modifiers to the same payload — and the quantity mapping matches
  * the pull keybinds (Shift = stack, Ctrl = max, Ctrl beats Shift):
  * <ul>
  *   <li><b>plain</b> — SINGLE (the recipe's own amounts), pull only when
@@ -42,14 +45,14 @@ public final class PullButtonClick {
      *                        where the viewer has no modifier source of its own
      * @return true if a payload was sent
      */
-    public static boolean send(String viewer, List<Ingredient> ingredients, int resultsPerCraft, boolean viewerShift) {
-        if (ingredients.stream().allMatch(Ingredient::isEmpty)) {
+    public static boolean send(String viewer, List<IngredientRequest> ingredients, int resultsPerCraft, boolean viewerShift) {
+        if (ingredients.stream().allMatch(IngredientRequest::isEmpty)) {
             JackItToMe.LOGGER.debug("[JackItToMe] {} recipe button clicked but recipe has no input slots.", viewer);
             return false;
         }
 
-        boolean shift    = viewerShift || Screen.hasShiftDown();
-        boolean ctrl     = Screen.hasControlDown();
+        boolean shift    = viewerShift || isEitherHeld(GLFW.GLFW_KEY_LEFT_SHIFT, GLFW.GLFW_KEY_RIGHT_SHIFT);
+        boolean ctrl     = isEitherHeld(GLFW.GLFW_KEY_LEFT_CONTROL, GLFW.GLFW_KEY_RIGHT_CONTROL);
         boolean override = isOverrideHeld();
         PullMode mode = ctrl ? PullMode.MAX : (shift ? PullMode.STACK : PullMode.SINGLE);
         // Bulk modes are an explicit "gather" intent and the override key is
@@ -61,7 +64,7 @@ public final class PullButtonClick {
 
         JackItToMe.LOGGER.info("[JackItToMe] {} recipe button: {} ingredients, mode={}, results/craft={}, pull={}, partial={}, autocraft=true.",
                 viewer, ingredients.size(), mode, resultsPerCraft, pullAvailable, override);
-        PacketDistributor.sendToServer(new PullIngredientsPayload(
+        ClientPacketDistributor.sendToServer(new PullIngredientsPayload(
                 ingredients, mode, Math.max(1, resultsPerCraft),
                 pullAvailable, /*fillPartial=*/ override, /*triggerAutocraft=*/ true));
         return true;
@@ -76,8 +79,21 @@ public final class PullButtonClick {
         var mapping = KeyBindings.PULL_OVERRIDE;
         if (mapping.isUnbound()) return false;
         var key = mapping.getKey();
-        if (key.getType() != com.mojang.blaze3d.platform.InputConstants.Type.KEYSYM) return false;
-        long window = net.minecraft.client.Minecraft.getInstance().getWindow().getWindow();
-        return com.mojang.blaze3d.platform.InputConstants.isKeyDown(window, key.getValue());
+        if (key.getType() != InputConstants.Type.KEYSYM) return false;
+        return isHeld(key.getValue());
+    }
+
+    /**
+     * Live keyboard state. A button click arrives without a key event, so
+     * there are no modifier flags to read off it - GLFW is the only source
+     * that knows what is held at this instant.
+     */
+    private static boolean isHeld(int glfwKey) {
+        Window window = Minecraft.getInstance().getWindow();
+        return window != null && InputConstants.isKeyDown(window, glfwKey);
+    }
+
+    private static boolean isEitherHeld(int leftKey, int rightKey) {
+        return isHeld(leftKey) || isHeld(rightKey);
     }
 }

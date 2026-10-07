@@ -30,6 +30,7 @@ import net.minecraft.world.item.ItemStack;
 import net.neoforged.fml.ModList;
 
 import java.util.Collection;
+import java.util.Iterator;
 import java.util.Optional;
 
 /**
@@ -45,12 +46,13 @@ import java.util.Optional;
  * {@code INetwork} through the public {@link ContainerTerminalStorageBase#getNetwork()},
  * so unlike the Refined Storage source this needs no reflection.
  * <p>
- * <b>Storage only — no autocrafting.</b> Integrated Crafting <em>can</em>
- * schedule craft jobs, but it has no "how many to craft?" amount-selection
- * popup like AE2 and RS do, so the {@link ItemSource#isAutocraftable} /
- * {@link ItemSource#openAutoCraftPopup} hooks are deliberately left at their
- * false defaults. That keeps this integration a pure pull source and avoids a
- * dependency on Integrated Crafting.
+ * <b>Autocrafting</b> is supported when the Integrated Crafting addon is
+ * present: {@link ItemSource#isAutocraftable} and
+ * {@link ItemSource#openAutoCraftPopup} go through the terminal's own crafting
+ * options, so the player gets the terminal's native amount-selection popup.
+ * Without the addon both stay false and this is a pure pull source - every
+ * Integrated Crafting reference lives in {@link IdCraftingSupport}, which is
+ * never loaded on a storage-only network.
  * <p>
  * Implementation notes:
  * <ul>
@@ -58,10 +60,11 @@ import java.util.Optional;
  *       plus same data components, ignoring stack size. This mirrors the
  *       mod's own {@code isSameItemSameComponents} contract (and is exactly
  *       what Integrated Dynamics uses internally for NBT-sensitive matching).</li>
- *   <li>Counting uses a {@code SIMULATE} extract of {@code Integer.MAX_VALUE} —
- *       the ingredient storage has no direct "how many of X" call, but a
- *       simulated extract returns exactly what's available. Same trick as the
- *       RS source.</li>
+ *   <li>Counting iterates the channel's matching entries and sums them. The
+ *       item network clamps every extract to a rate limit, so the simulated
+ *       extract the other sources use would report that limit rather than the
+ *       stored amount. Extraction is unaffected: the pull loop already asks in
+ *       chunks of at most one stack.</li>
  *   <li>Channel {@link IPositionedAddonsNetwork#WILDCARD_CHANNEL} (-1) spans
  *       every channel on the network, so we pull from the whole network the
  *       way AE2/RS do, regardless of which channel tab the player is viewing.</li>
@@ -105,10 +108,17 @@ public final class IntegratedDynamicsItemSource implements ItemSource {
         if (template.isEmpty()) return 0;
         IIngredientComponentStorage<ItemStack, Integer> storage = storageOf(player);
         if (storage == null) return 0;
-        // SIMULATE extract of "everything" returns exactly how much is present.
-        ItemStack probe = template.copyWithCount(Integer.MAX_VALUE);
-        ItemStack found = storage.extract(probe, MATCH, true);
-        return found.isEmpty() ? 0 : found.getCount();
+
+        // Sum the channel's matching entries. A simulated extract cannot answer
+        // this: the item network clamps every extract to its rate limit, so it
+        // reports how much can move in one operation, not how much is stored.
+        long total = 0;
+        Iterator<ItemStack> matching = storage.iterator(template.copyWithCount(1), MATCH);
+        while (matching.hasNext()) {
+            ItemStack found = matching.next();
+            if (found != null && !found.isEmpty()) total += found.getCount();
+        }
+        return total;
     }
 
     @Override
@@ -228,8 +238,14 @@ public final class IntegratedDynamicsItemSource implements ItemSource {
             HandlerWrappedTerminalCraftingOption<ItemStack> wrapped =
                     new HandlerWrappedTerminalCraftingOption<>(handler, option);
 
+            // Integrated Crafting counts recipe executions, not output items:
+            // the amount handed to the popup is multiplied by the recipe, so
+            // asking for 2 paper from a recipe that yields 3 would craft 6.
+            // AE2 and RS take the item count and divide it themselves.
+            int batches = craftsFor(option, template, amount);
+
             CraftingOptionGuiData<ItemStack, Integer, L> data = new CraftingOptionGuiData<>(
-                    component, tabName, channel, wrapped, amount, null,
+                    component, tabName, channel, wrapped, batches, null,
                     menu.getLocation(), menu.getLocationInstance());
 
             // Opens the amount sub-menu via player.openMenu — replaces the
@@ -237,8 +253,8 @@ public final class IntegratedDynamicsItemSource implements ItemSource {
             menu.getLocation().openContainerCraftingOptionAmount(data, player.level(), player);
 
             if (player.containerMenu != menu) {
-                JackItToMe.LOGGER.debug("[ID] opened crafting amount popup for {} (amount {})",
-                        template.getHoverName().getString(), amount);
+                JackItToMe.LOGGER.debug("[ID] opened crafting amount popup for {} ({} needed, {} craft(s))",
+                        template.getHoverName().getString(), amount, batches);
                 return true;
             }
             JackItToMe.LOGGER.debug("[ID] openContainerCraftingOptionAmount ran but menu didn't change");
@@ -246,6 +262,28 @@ public final class IntegratedDynamicsItemSource implements ItemSource {
         }
         JackItToMe.LOGGER.debug("[ID] no crafting option produces {}", template.getHoverName().getString());
         return false;
+    }
+
+    /**
+     * How many executions of {@code option}'s recipe are needed to yield
+     * {@code needed} of {@code template}. A recipe with no readable output for
+     * this item is treated as producing one per craft, which is the neutral
+     * assumption and never overshoots.
+     */
+    private static int craftsFor(ITerminalCraftingOption<ItemStack> option, ItemStack template, int needed) {
+        int perCraft = 0;
+        try {
+            for (ItemStack output : option.getOutputs(IngredientComponent.ITEMSTACK)) {
+                if (output != null && !output.isEmpty()
+                        && ItemStack.isSameItemSameComponents(output, template)) {
+                    perCraft += output.getCount();
+                }
+            }
+        } catch (Throwable t) {
+            JackItToMe.LOGGER.debug("[ID] could not read recipe outputs: {}", t.toString());
+        }
+        if (perCraft < 1) perCraft = 1;
+        return Math.max(1, (needed + perCraft - 1) / perCraft);
     }
 
     /** The Integrated Dynamics network behind the open terminal, or null. */

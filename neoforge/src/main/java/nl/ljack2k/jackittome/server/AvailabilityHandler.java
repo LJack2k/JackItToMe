@@ -1,5 +1,6 @@
 package nl.ljack2k.jackittome.server;
 
+import nl.ljack2k.jackittome.network.IngredientRequest;
 import nl.ljack2k.jackittome.network.AvailabilityResponsePayload;
 import nl.ljack2k.jackittome.network.CheckAvailabilityPayload;
 import nl.ljack2k.jackittome.source.ItemSource;
@@ -8,7 +9,6 @@ import nl.ljack2k.jackittome.source.ItemSourceRegistry;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.crafting.Ingredient;
 import net.neoforged.neoforge.network.PacketDistributor;
 
 import java.util.ArrayList;
@@ -42,7 +42,7 @@ public final class AvailabilityHandler {
      * Public so {@link PullHandler} can use the same simulator for its
      * server-authoritative shortage gate and its Shift-click chain selection.
      */
-    public static Result simulate(ServerPlayer player, List<Ingredient> ingredients) {
+    public static Result simulate(ServerPlayer player, List<IngredientRequest> ingredients) {
         List<Boolean> shortages = new ArrayList<>(ingredients.size());
         List<Boolean> craftable = new ArrayList<>(ingredients.size());
 
@@ -61,8 +61,8 @@ public final class AvailabilityHandler {
         // listing each variant separately, so Item is sufficient as a key.
         Map<Item, Long> remaining = new HashMap<>();
 
-        for (Ingredient ing : ingredients) {
-            if (ing.isEmpty()) {
+        for (IngredientRequest request : ingredients) {
+            if (request.isEmpty()) {
                 // Empty slot in the recipe — not a shortage, not craftable.
                 shortages.add(Boolean.FALSE);
                 craftable.add(Boolean.FALSE);
@@ -72,8 +72,7 @@ public final class AvailabilityHandler {
             // Find the variant with the most remaining (matching the live resolver).
             ItemStack bestStack = ItemStack.EMPTY;
             long bestCount = 0;
-            for (ItemStack acceptable : ing.getItems()) {
-                if (acceptable.isEmpty()) continue;
+            for (ItemStack acceptable : request.variants()) {
                 Item item = acceptable.getItem();
                 Long cached = remaining.get(item);
                 long count = (cached != null) ? cached : source.count(acceptable, player);
@@ -91,8 +90,7 @@ public final class AvailabilityHandler {
                 // the first hit because both AE2 and RS make this a cheap O(1)
                 // set/service lookup, so even N variants is fine.
                 boolean anyCraftable = false;
-                for (ItemStack acceptable : ing.getItems()) {
-                    if (acceptable.isEmpty()) continue;
+                for (ItemStack acceptable : request.variants()) {
                     if (source.isAutocraftable(acceptable, player)) {
                         anyCraftable = true;
                         break;
@@ -116,16 +114,15 @@ public final class AvailabilityHandler {
      * Feeds the button tooltip's "Can make: N" line (the client multiplies by
      * the recipe's results-per-craft for display).
      */
-    private static int craftsPossible(ItemSource source, ServerPlayer player, List<Ingredient> ingredients) {
+    private static int craftsPossible(ItemSource source, ServerPlayer player, List<IngredientRequest> ingredients) {
         Map<Item, Long> stock = new HashMap<>();
         Map<Item, Integer> perCraft = new HashMap<>();
 
-        for (Ingredient ing : ingredients) {
-            if (ing.isEmpty()) continue;
+        for (IngredientRequest request : ingredients) {
+            if (request.isEmpty()) continue;
             ItemStack best = ItemStack.EMPTY;
             long bestAvailable = -1;
-            for (ItemStack acceptable : ing.getItems()) {
-                if (acceptable.isEmpty()) continue;
+            for (ItemStack acceptable : request.variants()) {
                 long available = stock.computeIfAbsent(acceptable.getItem(),
                         k -> source.count(acceptable, player));
                 if (available > bestAvailable) {
@@ -134,7 +131,7 @@ public final class AvailabilityHandler {
                 }
             }
             if (best.isEmpty()) continue;
-            perCraft.merge(best.getItem(), Math.max(1, best.getCount()), Integer::sum);
+            perCraft.merge(best.getItem(), Math.max(1, request.amount()), Integer::sum);
         }
         if (perCraft.isEmpty()) return 0;
 

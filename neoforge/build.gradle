@@ -14,7 +14,7 @@ plugins {
     id 'maven-publish'
     // ModDevGradle — the modern way to develop NeoForge mods. Check
     // https://github.com/neoforged/ModDevGradle for the latest version.
-    id 'net.neoforged.moddev' version '1.0.20'
+    id 'net.neoforged.moddev' version '2.0.144'
 }
 
 version = mod_version
@@ -46,9 +46,8 @@ repositories {
     // CurseMaven — public proxy for CurseForge mod files. Single source for all
     // our mod-specific deps (JEI, AE2, RS). Look up coordinates per file via the
     // CurseForge file page's "Curse Maven Snippet" panel.
-    maven { name = 'TerraformersMC (EMI)'; url = 'https://maven.terraformersmc.com/releases' }
-    maven { name = 'Shedaniel (REI)';     url = 'https://maven.shedaniel.me/'              }
-    maven { name = 'Architectury';        url = 'https://maven.architectury.dev/'           }
+    maven { name = 'Shedaniel (REI)'; url = 'https://maven.shedaniel.me/' }
+    maven { name = 'Architectury';    url = 'https://maven.architectury.dev/' }
     maven {
         name = 'CurseMaven'
         url = 'https://www.cursemaven.com'
@@ -77,7 +76,7 @@ neoForge {
     // Parchment mappings are optional — they give nicer parameter names in
     // decompiled Minecraft code but the mod compiles fine without them. Re-enable
     // once you've picked a real version from:
-    //   https://maven.parchmentmc.org/org/parchmentmc/data/parchment-1.21/
+    //   https://maven.parchmentmc.org/org/parchmentmc/data/
     // (Browse the URL in a web browser to see the version directories.)
     //
     // parchment {
@@ -118,22 +117,21 @@ neoForge {
 }
 
 dependencies {
-    // All three deps come from CurseMaven. Coordinate format:
+    // All deps come from CurseMaven. Coordinate format:
     //   curse.maven:<slug>-<projectId>:<fileId>
     // The slug-projectId pair is stable per mod; the fileId is per-release.
     // To bump versions: open the CurseForge file page, copy "Curse Maven Snippet",
     // and update gradle.properties.
 
-    // All three recipe viewers are compiled against (compileOnly) so the JEI,
-    // EMI and REI integration code always builds. At RUNTIME, though, only one
+    // Both recipe viewers are compiled against (compileOnly) so the JEI and
+    // REI integration code always builds. At RUNTIME, though, only one
     // viewer should be present — JEI and REI actively conflict, and our
-    // ClientEvents.initBridge() picks the first viewer it finds (JEI > EMI > REI),
+    // ClientEvents.initBridge() picks the first viewer it finds (JEI > REI),
     // so loading several at once would mask the others.
     //
     // The `recipeViewer` Gradle property selects which viewer is on the run
     // classpath. Default is `jei` (the original behaviour). Examples:
     //   ./gradlew :neoforge:runClient                      → JEI
-    //   ./gradlew :neoforge:runClient -PrecipeViewer=emi   → EMI only
     //   ./gradlew :neoforge:runClient -PrecipeViewer=rei   → REI only
     //   ./gradlew :neoforge:runClient -PrecipeViewer=none  → no viewer
     def recipeViewer = (project.findProperty('recipeViewer') ?: 'jei').toString().toLowerCase()
@@ -210,15 +208,6 @@ dependencies {
         runtimeOnly "curse.maven:toms-storage-378609:${tomsstorage_curse_file_id}"
     }
 
-    // ---- EMI (optional recipe viewer) ----
-    // NOTE: the FULL jar, not the ':api' classifier. RecipeDisplayMixin targets
-    // dev.emi.emi.screen.RecipeDisplay / WidgetGroup and reads EmiConfig, none of
-    // which ship in the api artifact. Still compileOnly — nothing is bundled, and
-    // EMI stays an optional runtime dep.
-    compileOnly "dev.emi:emi-neoforge:${emi_version}"
-    if (recipeViewer == 'emi') {
-        runtimeOnly "dev.emi:emi-neoforge:${emi_version}"
-    }
 
     // ---- REI (optional recipe viewer) ----
     // The FULL jar, not the api artifact: the rei/mixin classes target

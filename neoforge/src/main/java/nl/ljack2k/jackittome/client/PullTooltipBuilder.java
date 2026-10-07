@@ -2,7 +2,7 @@ package nl.ljack2k.jackittome.client;
 
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
-import net.minecraft.world.item.crafting.Ingredient;
+import nl.ljack2k.jackittome.network.IngredientRequest;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -27,7 +27,7 @@ public final class PullTooltipBuilder {
      * @param resultsPerCraft output items per craft — converts the server's
      *                        whole-crafts count into the "Can make: N" line
      */
-    public static List<Component> build(Object recipeKey, List<Ingredient> ingredients, int resultsPerCraft) {
+    public static List<Component> build(Object recipeKey, List<IngredientRequest> ingredients, int resultsPerCraft) {
         int total = (int) ingredients.stream().filter(i -> !i.isEmpty()).count();
         List<Boolean> shortages = AvailabilityCache.shortagesFor(recipeKey);
         List<Boolean> craftable = AvailabilityCache.craftableFor(recipeKey);

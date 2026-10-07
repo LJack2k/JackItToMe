@@ -17,9 +17,9 @@ logoFile = "icon.png"
 # logoBlur = true is fine for a smooth/rendered icon. Set false for pixel-art.
 logoBlur = true
 
-# Client-only mixins, all EMI-targeting. The config's plugin skips them entirely
-# when EMI is absent, so JEI/REI/no-viewer users never load them — see
-# EmiMixinPlugin for why EMI's own setting makes this necessary.
+# Client-only mixins, all REI-targeting. The mixin config's plugin skips them
+# entirely when REI is absent, so JEI and no-viewer users never load them.
+# See ViewerMixinPlugin.
 [[mixins]]
 config = "jackittome.mixins.json"
 
@@ -38,25 +38,18 @@ versionRange = "${minecraft_version_range}"
 ordering = "NONE"
 side = "BOTH"
 
-# --- Optional recipe viewers (JEI, EMI, REI — one of them, or none) ---
+# --- Optional recipe viewers (JEI, REI — one of them, or none) ---
 [[dependencies.${mod_id}]]
 modId = "jei"
 type = "optional"
-versionRange = "[19.0.0,)"
-ordering = "AFTER"
-side = "CLIENT"
-
-[[dependencies.${mod_id}]]
-modId = "emi"
-type = "optional"
-versionRange = "[1.1.0,)"
+versionRange = "[29.0.0,)"
 ordering = "AFTER"
 side = "CLIENT"
 
 [[dependencies.${mod_id}]]
 modId = "roughlyenoughitems"
 type = "optional"
-versionRange = "[16.0.0,)"
+versionRange = "[26.1.0,)"
 ordering = "AFTER"
 side = "CLIENT"
 

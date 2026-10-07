@@ -2,8 +2,8 @@ package nl.ljack2k.jackittome.client;
 
 import nl.ljack2k.jackittome.network.CheckAvailabilityPayload;
 
-import net.minecraft.world.item.crafting.Ingredient;
-import net.neoforged.neoforge.network.PacketDistributor;
+import nl.ljack2k.jackittome.network.IngredientRequest;
+import net.neoforged.neoforge.client.network.ClientPacketDistributor;
 
 import java.util.List;
 
@@ -22,7 +22,7 @@ public final class PullHoverPoller {
     private boolean wasHovered = false;
     private long lastQueryTime = 0;
 
-    public void tick(boolean hovered, Object recipeKey, List<Ingredient> ingredients) {
+    public void tick(boolean hovered, Object recipeKey, List<IngredientRequest> ingredients) {
         if (hovered && !wasHovered) {
             AvailabilityCache.clear();
             fire(recipeKey, ingredients);
@@ -39,9 +39,9 @@ public final class PullHoverPoller {
         wasHovered = hovered;
     }
 
-    private static void fire(Object recipeKey, List<Ingredient> ingredients) {
+    private static void fire(Object recipeKey, List<IngredientRequest> ingredients) {
         if (ingredients.isEmpty()) return;
         long nonce = AvailabilityCache.beginHover(recipeKey);
-        PacketDistributor.sendToServer(new CheckAvailabilityPayload(nonce, ingredients));
+        ClientPacketDistributor.sendToServer(new CheckAvailabilityPayload(nonce, ingredients));
     }
 }

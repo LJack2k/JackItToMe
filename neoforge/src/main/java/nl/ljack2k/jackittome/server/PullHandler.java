@@ -3,6 +3,7 @@ package nl.ljack2k.jackittome.server;
 import nl.ljack2k.jackittome.JackItToMe;
 import nl.ljack2k.jackittome.network.AutocraftChainPayload;
 import nl.ljack2k.jackittome.network.JackFeedbackPayload;
+import nl.ljack2k.jackittome.network.IngredientRequest;
 import nl.ljack2k.jackittome.network.PullIngredientsPayload;
 import nl.ljack2k.jackittome.network.PullMode;
 import nl.ljack2k.jackittome.source.ItemSource;
@@ -11,7 +12,6 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.crafting.Ingredient;
 import net.neoforged.neoforge.network.PacketDistributor;
 
 import java.util.ArrayList;
@@ -204,18 +204,17 @@ public final class PullHandler {
         // the network only has enough for one slot.
         Map<Item, Long> stockSnapshot = new HashMap<>();
 
-        for (Ingredient ingredient : payload.ingredients()) {
-            if (ingredient.isEmpty()) continue;
+        for (IngredientRequest request : payload.ingredients()) {
+            if (request.isEmpty()) continue;
 
-            int desired = firstCount(ingredient);
+            int desired = Math.max(1, request.amount());
             totalRequested += desired;
 
             // Pick the most abundant *remaining* variant according to the
             // snapshot. This switches automatically as variants run out.
             ItemStack best = ItemStack.EMPTY;
             long bestRemaining = 0;
-            for (ItemStack acceptable : ingredient.getItems()) {
-                if (acceptable.isEmpty()) continue;
+            for (ItemStack acceptable : request.variants()) {
                 Item item = acceptable.getItem();
                 long remaining = stockSnapshot.computeIfAbsent(item,
                         k -> source.count(acceptable, player));
@@ -240,7 +239,7 @@ public final class PullHandler {
             // Autocraft pass — queue ONLY the shortfall (what the network
             // is short by), not the full recipe count.
             if (payload.triggerAutocraft() && shortfall > 0) {
-                ItemStack candidate = firstCraftableVariant(ingredient, source, player, shortfall);
+                ItemStack candidate = firstCraftableVariant(request, source, player, shortfall);
                 if (!candidate.isEmpty()) {
                     chainCandidates.add(candidate);
                 }
@@ -276,13 +275,12 @@ public final class PullHandler {
         java.util.LinkedHashMap<Item, Integer> perCraft = new java.util.LinkedHashMap<>();
         Map<Item, ItemStack> template = new HashMap<>();
 
-        for (Ingredient ingredient : payload.ingredients()) {
-            if (ingredient.isEmpty()) continue;
+        for (IngredientRequest request : payload.ingredients()) {
+            if (request.isEmpty()) continue;
 
             ItemStack best = ItemStack.EMPTY;
             long bestAvailable = -1;
-            for (ItemStack acceptable : ingredient.getItems()) {
-                if (acceptable.isEmpty()) continue;
+            for (ItemStack acceptable : request.variants()) {
                 long available = stock.computeIfAbsent(acceptable.getItem(),
                         k -> source.count(acceptable, player));
                 if (available > bestAvailable) {
@@ -292,8 +290,8 @@ public final class PullHandler {
             }
             if (best.isEmpty()) continue;
 
-            perCraft.merge(best.getItem(), Math.max(1, best.getCount()), Integer::sum);
-            template.putIfAbsent(best.getItem(), best.copyWithCount(1));
+            perCraft.merge(best.getItem(), Math.max(1, request.amount()), Integer::sum);
+            template.putIfAbsent(best.getItem(), best);
         }
         if (perCraft.isEmpty()) {
             return new Simulation(List.of(), List.of(), 0, 0);
@@ -377,10 +375,9 @@ public final class PullHandler {
      * so that {@link #aggregateByItem} can sum across slots wanting the same
      * item.
      */
-    private static ItemStack firstCraftableVariant(Ingredient ingredient, ItemSource source, ServerPlayer player, int amount) {
+    private static ItemStack firstCraftableVariant(IngredientRequest request, ItemSource source, ServerPlayer player, int amount) {
         int safeAmount = Math.max(1, amount);
-        for (ItemStack acceptable : ingredient.getItems()) {
-            if (acceptable.isEmpty()) continue;
+        for (ItemStack acceptable : request.variants()) {
             if (source.isAutocraftable(acceptable, player)) {
                 return acceptable.copyWithCount(safeAmount);
             }
@@ -424,19 +421,10 @@ public final class PullHandler {
      */
     private record SlotPlan(ItemStack best, int pullable) {}
 
-    private static int firstCount(Ingredient ingredient) {
-        ItemStack[] items = ingredient.getItems();
-        if (items.length == 0) return 1;
-        int c = items[0].getCount();
-        return c <= 0 ? 1 : c;
-    }
-
     /** First acceptable item across all ingredients — used as the animation icon. */
-    private static ItemStack firstRepresentative(java.util.List<Ingredient> ingredients) {
-        for (Ingredient ing : ingredients) {
-            if (ing.isEmpty()) continue;
-            ItemStack[] items = ing.getItems();
-            if (items.length > 0 && !items[0].isEmpty()) return items[0];
+    private static ItemStack firstRepresentative(java.util.List<IngredientRequest> requests) {
+        for (IngredientRequest request : requests) {
+            if (!request.isEmpty()) return request.firstVariant();
         }
         return ItemStack.EMPTY;
     }

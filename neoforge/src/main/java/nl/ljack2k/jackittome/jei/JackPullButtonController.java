@@ -1,6 +1,7 @@
 package nl.ljack2k.jackittome.jei;
 
 import nl.ljack2k.jackittome.JackItToMe;
+import nl.ljack2k.jackittome.network.IngredientRequest;
 import nl.ljack2k.jackittome.network.PullIngredientsPayload;
 
 import mezz.jei.api.gui.IRecipeLayoutDrawable;
@@ -17,13 +18,12 @@ import mezz.jei.api.recipe.RecipeIngredientRole;
 import nl.ljack2k.jackittome.client.AvailabilityCache;
 import nl.ljack2k.jackittome.network.CheckAvailabilityPayload;
 
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.renderer.Rect2i;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.crafting.Ingredient;
-import net.neoforged.neoforge.network.PacketDistributor;
+import net.neoforged.neoforge.client.network.ClientPacketDistributor;
 
 import org.lwjgl.glfw.GLFW;
 
@@ -37,7 +37,7 @@ import java.util.List;
  * recipe's right edge).
  * <p>
  * On click, builds a {@link PullIngredientsPayload} from the recipe's input
- * slots — each slot becomes one {@link Ingredient} that lists every variant
+ * slots — each slot becomes one {@link IngredientRequest} that lists every variant
  * the slot accepts. The server's most-abundant resolver then picks whichever
  * variant the player's storage actually has.
  */
@@ -48,8 +48,8 @@ public class JackPullButtonController implements IIconButtonController {
      * we hand it, so this must not carry a painted border of its own (unlike
      * {@code jack_button.png}, which EMI needs because EMI supplies no chrome).
      */
-    private static final ResourceLocation ICON_TEXTURE =
-            ResourceLocation.fromNamespaceAndPath(JackItToMe.MODID, "textures/gui/jack_icon.png");
+    private static final Identifier ICON_TEXTURE =
+            Identifier.fromNamespaceAndPath(JackItToMe.MODID, "textures/gui/jack_icon.png");
 
     /**
      * The glyph's native size in GUI units. Drawing it at any other size
@@ -125,7 +125,7 @@ public class JackPullButtonController implements IIconButtonController {
     private static final long REFRESH_MS = 750;
 
     @Override
-    public void drawExtras(GuiGraphics guiGraphics, Rect2i buttonArea, int mouseX, int mouseY, float partialTicks) {
+    public void drawExtras(GuiGraphicsExtractor guiGraphics, Rect2i buttonArea, int mouseX, int mouseY, float partialTicks) {
         boolean isHovered =
                 mouseX >= buttonArea.getX() && mouseX < buttonArea.getX() + buttonArea.getWidth() &&
                 mouseY >= buttonArea.getY() && mouseY < buttonArea.getY() + buttonArea.getHeight();
@@ -172,7 +172,7 @@ public class JackPullButtonController implements IIconButtonController {
      * autocraft popups for these slots (and a single P-key press on the slot
      * itself will pop the popup directly for that one item).
      */
-    private void drawShortageOverlays(GuiGraphics gg) {
+    private void drawShortageOverlays(GuiGraphicsExtractor gg) {
         // Only render while this controller's button is the one being hovered
         // — protects against the cache holding data from a previous session
         // (different recipe view, different open container). The cache itself
@@ -192,8 +192,8 @@ public class JackPullButtonController implements IIconButtonController {
         List<IRecipeSlotView> inputs = slotsView.getSlotViews(RecipeIngredientRole.INPUT);
         Rect2i recipeRect = layoutDrawable.getRect();
 
-        gg.pose().pushPose();
-        gg.pose().translate(recipeRect.getX(), recipeRect.getY(), 0);
+        gg.pose().pushMatrix();
+        gg.pose().translate(recipeRect.getX(), recipeRect.getY());
 
         int n = Math.min(inputs.size(), shortages.size());
         for (int i = 0; i < n; i++) {
@@ -202,7 +202,7 @@ public class JackPullButtonController implements IIconButtonController {
             inputs.get(i).drawHighlight(gg, canCraft ? CRAFTABLE_OVERLAY_COLOR : SHORTAGE_OVERLAY_COLOR);
         }
 
-        gg.pose().popPose();
+        gg.pose().popMatrix();
     }
 
     /** Translucent red — matches the visual of JEI's own missing-slot error. */
@@ -211,32 +211,34 @@ public class JackPullButtonController implements IIconButtonController {
     private static final int CRAFTABLE_OVERLAY_COLOR = 0x8040FF40;
 
     private void fireAvailabilityCheck() {
-        List<Ingredient> ingredients = collectInputIngredients();
+        List<IngredientRequest> ingredients = collectInputIngredients();
         if (ingredients.isEmpty()) return;
         long nonce = AvailabilityCache.beginHover(layoutDrawable.getRecipe());
-        PacketDistributor.sendToServer(new CheckAvailabilityPayload(nonce, ingredients));
+        ClientPacketDistributor.sendToServer(new CheckAvailabilityPayload(nonce, ingredients));
     }
 
     /**
-     * Walk the recipe's input slots and build one Ingredient per slot, each
+     * Walk the recipe's input slots and build one request per slot, each
      * containing all the slot's acceptable items (the cycling-variant case).
      * <p>
-     * Crucially, this preserves <em>empty</em> slots as {@link Ingredient#EMPTY}
+     * Crucially, this preserves <em>empty</em> slots as {@link IngredientRequest#EMPTY}
      * rather than skipping them. Recipes like a vanilla chest are 3×3 with the
      * center cell empty — keeping the position in the list means the decorator's
      * iteration over slot views aligns 1:1 with the server's shortage list.
-     * The server treats {@code Ingredient#EMPTY} as "not a shortage", so empty
+     * The server treats an empty request as "not a shortage", so empty
      * slots never get a red overlay.
      */
-    private List<Ingredient> collectInputIngredients() {
-        List<Ingredient> out = new ArrayList<>();
+    private List<IngredientRequest> collectInputIngredients() {
+        List<IngredientRequest> out = new ArrayList<>();
         IRecipeSlotsView slots = layoutDrawable.getRecipeSlotsView();
         for (IRecipeSlotView slot : slots.getSlotViews(RecipeIngredientRole.INPUT)) {
             List<ItemStack> stacks = slot.getItemStacks().toList();
             if (stacks.isEmpty()) {
-                out.add(Ingredient.EMPTY);
+                out.add(IngredientRequest.EMPTY);
             } else {
-                out.add(Ingredient.of(stacks.toArray(ItemStack[]::new)));
+                // Every variant of one slot shows the same count - the recipe's
+                // per-slot amount - so the first one speaks for the slot.
+                out.add(IngredientRequest.of(stacks.getFirst().getCount(), stacks));
             }
         }
         return out;

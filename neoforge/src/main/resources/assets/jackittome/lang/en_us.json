@@ -12,20 +12,17 @@
     "jackittome.configuration.title": "JackItToMe Settings",
     "jackittome.configuration.section.jackittome.client.toml": "Client Settings",
 
-    "jackittome.configuration.forceRecipeButton": "Place Button Ourselves",
-    "jackittome.configuration.forceRecipeButton.tooltip": "On (recommended): the jack button gets its own column beside each recipe, always visible and never overlapping recipe content. Off: we fall back to EMI's decorator system, which hides all mod-added widgets unless EMI's own 'Show Recipe Decorators' (Dev section) is enabled — with both off, no button appears at all. Only turn this off if a future EMI release breaks our placement.",
-
     "jackittome.configuration.showRecipeButton": "Show Recipe Button",
     "jackittome.configuration.showRecipeButton.tooltip": "Show the jack button on recipes, in whichever recipe viewer you use. Turn it off to pull only with the keybinds — the G keys, autocrafting and the hover tooltip keep working. The button already hides itself when there is nothing to pull from, i.e. when a recipe is opened with only your own inventory behind it.",
 
     "jackittome.configuration.buttonOffsetX": "Button Offset X",
-    "jackittome.configuration.buttonOffsetX.tooltip": "EMI and REI only. Moves the recipe button horizontally, in GUI pixels; positive moves it right. JEI is unaffected, as it positions its own recipe buttons.",
+    "jackittome.configuration.buttonOffsetX.tooltip": "REI only. Moves the recipe button horizontally, in GUI pixels; positive moves it right. JEI is unaffected, as it positions its own recipe buttons.",
 
     "jackittome.configuration.buttonOffsetY": "Button Offset Y",
-    "jackittome.configuration.buttonOffsetY.tooltip": "EMI and REI only. Moves the recipe button vertically, in GUI pixels; positive moves it down.",
+    "jackittome.configuration.buttonOffsetY.tooltip": "REI only. Moves the recipe button vertically, in GUI pixels; positive moves it down.",
 
     "jackittome.configuration.placementKeys": "Button Placement Mode",
-    "jackittome.configuration.placementKeys.tooltip": "EMI and REI only. While enabled, open any recipe and press Ctrl + the arrow keys to move the jack button; Ctrl+Home puts it back. The position is saved automatically, so you can switch this off again once it looks right.",
+    "jackittome.configuration.placementKeys.tooltip": "REI only. While enabled, open any recipe and press Ctrl + the arrow keys to move the jack button; Ctrl+Home puts it back. The position is saved automatically, so you can switch this off again once it looks right.",
 
     "jackittome.placement.title": "Button placement",
     "jackittome.placement.move": "Ctrl + arrows to move",
@@ -34,7 +31,7 @@
     "jackittome.placement.reset": "Reset",
     "jackittome.placement.done": "Done",
 
-    "key.categories.jackittome": "JackItToMe",
+    "key.category.jackittome.keys": "JackItToMe",
     "key.jackittome.jack_hovered": "Jack hovered item",
     "key.jackittome.jack_stack": "Jack a full stack",
     "key.jackittome.jack_max": "Jack as much as fits",

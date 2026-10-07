@@ -5,7 +5,7 @@ import mezz.jei.api.IModPlugin;
 import mezz.jei.api.JeiPlugin;
 import mezz.jei.api.registration.IAdvancedRegistration;
 import mezz.jei.api.runtime.IJeiRuntime;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 
 /**
  * JEI plugin. Two responsibilities:
@@ -24,8 +24,8 @@ public final class JackItToMeJeiPlugin implements IModPlugin {
     private static IJeiRuntime runtime;
 
     @Override
-    public ResourceLocation getPluginUid() {
-        return ResourceLocation.fromNamespaceAndPath(JackItToMe.MODID, "jei_plugin");
+    public Identifier getPluginUid() {
+        return Identifier.fromNamespaceAndPath(JackItToMe.MODID, "jei_plugin");
     }
 
     @Override

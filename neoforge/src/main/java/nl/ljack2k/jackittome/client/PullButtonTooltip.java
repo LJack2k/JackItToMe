@@ -1,11 +1,12 @@
 package nl.ljack2k.jackittome.client;
 
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 
 import java.util.List;
+import java.util.Optional;
 
 /**
  * Draws the pull button's tooltip to the LEFT of the button instead of at the
@@ -16,12 +17,11 @@ import java.util.List;
  * highlights that say which ingredients are missing, which is exactly what the
  * player is hovering the button to find out.
  * <p>
- * Neither viewer can express this: EMI's {@code WidgetTooltipHolder} takes no
- * position at all, and REI positions from a point whose anchoring is its own
- * business. So the button records where it is, in SCREEN coordinates, while it
- * is hovered, and the tooltip is drawn afterwards from a screen render event —
- * outside the translated coordinate space the viewers render widgets in, and
- * late enough to sit above the recipe.
+ * REI cannot express this: it positions from a point whose anchoring is its
+ * own business. So the button records where it is, in SCREEN coordinates,
+ * while it is hovered, and the tooltip is queued afterwards from a screen
+ * render event — outside the translated coordinate space the viewer renders
+ * widgets in.
  */
 public final class PullButtonTooltip {
     private PullButtonTooltip() {}
@@ -47,7 +47,7 @@ public final class PullButtonTooltip {
     }
 
     /** Draws and consumes any tooltip queued this frame. */
-    public static void render(GuiGraphics graphics, Screen screen) {
+    public static void render(GuiGraphicsExtractor graphics, Screen screen) {
         List<Component> queued = lines;
         lines = null;
         if (queued == null || queued.isEmpty() || screen == null) return;
@@ -69,9 +69,9 @@ public final class PullButtonTooltip {
         int leftMost = SCREEN_MARGIN - VANILLA_X_OFFSET;
         if (x < leftMost) x = leftMost;
 
-        graphics.pose().pushPose();
-        graphics.pose().translate(0, 0, 400);   // above recipe content
-        graphics.renderComponentTooltip(mc.font, queued, x, buttonY);
-        graphics.pose().popPose();
+        // Queued rather than drawn: tooltips are collected and rendered in a
+        // late pass of their own, so this lands above the recipe without any
+        // depth juggling on our side.
+        graphics.setTooltipForNextFrame(mc.font, queued, Optional.empty(), x, buttonY);
     }
 }

@@ -2,8 +2,8 @@ package nl.ljack2k.jackittome.client;
 
 import nl.ljack2k.jackittome.JackItToMe;
 import nl.ljack2k.jackittome.jei.JeiViewerBridge;
-import nl.ljack2k.jackittome.emi.EmiViewerBridge;
 import nl.ljack2k.jackittome.rei.ReiViewerBridge;
+import nl.ljack2k.jackittome.network.IngredientRequest;
 import nl.ljack2k.jackittome.network.PullIngredientsPayload;
 import nl.ljack2k.jackittome.network.PullMode;
 
@@ -11,25 +11,24 @@ import com.mojang.blaze3d.platform.InputConstants;
 import com.mojang.blaze3d.platform.Window;
 
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.crafting.Ingredient;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.ModList;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.event.ScreenEvent;
-import net.neoforged.neoforge.network.PacketDistributor;
+import net.neoforged.neoforge.client.network.ClientPacketDistributor;
 
 import java.util.List;
 
 /**
  * Client-side keybind and screen-event handler.
  * <p>
- * Viewer-specific logic (JEI / EMI / REI) is fully isolated behind
+ * Viewer-specific logic (JEI / REI) is fully isolated behind
  * {@link RecipeViewerBridge} so this class never directly imports viewer
  * classes, avoiding {@link ClassNotFoundException} when a viewer is absent.
  * <p>
@@ -57,7 +56,6 @@ public final class ClientEvents {
 
     private static RecipeViewerBridge initBridge() {
         if (ModList.get().isLoaded("jei"))                return new JeiViewerBridge();
-        if (ModList.get().isLoaded("emi"))                return new EmiViewerBridge();
         if (ModList.get().isLoaded("roughlyenoughitems")) return new ReiViewerBridge();
         return new NullRecipeViewerBridge();
     }
@@ -72,7 +70,7 @@ public final class ClientEvents {
         // Ctrl + arrows reposition the recipe button (Ctrl+Home resets). Only on a
         // recipe screen, and never while the viewer's search box has focus — there
         // Ctrl+Left/Right is word-jump and stealing it would be maddening.
-        if (Screen.hasControlDown()
+        if (event.getKeyEvent().hasControlDown()
                 && JackConfig.PLACEMENT_KEYS.get()
                 && bridge().isRecipeScreen(event.getScreen())
                 && placementAvailable()
@@ -97,7 +95,7 @@ public final class ClientEvents {
         // physical G key and differ only in KeyModifier, and NONE-modifier
         // binds also match while a modifier is held — so checking MAX before
         // STACK before SINGLE keeps "Ctrl beats Shift beats plain".
-        InputConstants.Key key = InputConstants.getKey(event.getKeyCode(), event.getScanCode());
+        InputConstants.Key key = InputConstants.getKey(event.getKeyEvent());
         PullMode mode;
         if      (KeyBindings.JACK_MAX.isActiveAndMatches(key))     mode = PullMode.MAX;
         else if (KeyBindings.JACK_STACK.isActiveAndMatches(key))   mode = PullMode.STACK;
@@ -161,29 +159,27 @@ public final class ClientEvents {
     // ---- Pull logic -----------------------------------------------------
 
     private static void handleJackHovered(Minecraft mc, PullMode mode) {
-        Ingredient ing = tryRecipeSlotIngredient(mc);
+        IngredientRequest request = tryRecipeSlotRequest(mc);
 
-        if (ing == null) {
+        if (request == null) {
             ItemStack hovered = hoveredItemStack(mc);
             if (hovered.isEmpty()) {
                 JackItToMe.LOGGER.debug("[JackItToMe] Jack key pressed but no hovered item found.");
                 return;
             }
-            // Normalize to count 1: the server reads the ingredient's embedded
-            // count as the per-slot request ("recipe wants 3"), but a hovered
-            // container slot carries however many happen to be stacked there —
-            // wrapping a 64-stack unnormalized made SINGLE pull the whole stack.
-            ing = Ingredient.of(hovered.copyWithCount(1));
+            // The keybind asks for one; the mode scales it server-side. However
+            // many happen to be stacked in the hovered slot is not the request.
+            request = IngredientRequest.of(1, hovered);
         }
 
         JackItToMe.LOGGER.info("[JackItToMe] Jack key pressed — mode={}", mode);
 
-        PacketDistributor.sendToServer(new PullIngredientsPayload(
-                List.of(ing), mode, /*resultsPerCraft=*/ 1,
+        ClientPacketDistributor.sendToServer(new PullIngredientsPayload(
+                List.of(request), mode, /*resultsPerCraft=*/ 1,
                 /*pullAvailable=*/ true, /*fillPartial=*/ false, /*triggerAutocraft=*/ true));
     }
 
-    private static Ingredient tryRecipeSlotIngredient(Minecraft mc) {
+    private static IngredientRequest tryRecipeSlotRequest(Minecraft mc) {
         Screen screen = mc.screen;
         if (screen == null || !bridge().isRecipeScreen(screen)) return null;
 
@@ -195,12 +191,9 @@ public final class ClientEvents {
         if (variants.size() < 2) return null;
 
         JackItToMe.LOGGER.info("[JackItToMe] Requesting recipe slot with {} acceptable variants.", variants.size());
-        // Same count normalization as the plain hover path: the keybind means
-        // "pull one" (modifiers scale it) — recipe-slot display counts are not
-        // the request.
-        return Ingredient.of(variants.stream()
-                .map(s -> s.copyWithCount(1))
-                .toArray(ItemStack[]::new));
+        // Same as the plain hover path: one per press, whatever the recipe
+        // slot happens to display.
+        return IngredientRequest.of(1, variants);
     }
 
     private static ItemStack hoveredItemStack(Minecraft mc) {
@@ -209,7 +202,7 @@ public final class ClientEvents {
 
         // 1) Container slot under mouse — vanilla path.
         if (screen instanceof AbstractContainerScreen<?> acs) {
-            Slot slot = acs.getSlotUnderMouse();
+            Slot slot = acs.getHoveredSlot();
             if (slot != null && !slot.getItem().isEmpty()) return slot.getItem();
         }
 

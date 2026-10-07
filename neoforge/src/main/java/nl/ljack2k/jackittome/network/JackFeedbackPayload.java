@@ -6,7 +6,7 @@ import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 
@@ -40,7 +40,7 @@ import java.util.List;
 public record JackFeedbackPayload(List<ItemStack> successItems, ItemStack failureItem) implements CustomPacketPayload {
 
     public static final Type<JackFeedbackPayload> TYPE =
-            new Type<>(ResourceLocation.fromNamespaceAndPath(JackItToMe.MODID, "jack_feedback"));
+            new Type<>(Identifier.fromNamespaceAndPath(JackItToMe.MODID, "jack_feedback"));
 
     public static final StreamCodec<RegistryFriendlyByteBuf, JackFeedbackPayload> STREAM_CODEC =
             StreamCodec.composite(

@@ -6,9 +6,8 @@ import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.world.item.crafting.Ingredient;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 
 import java.util.List;
@@ -48,7 +47,7 @@ import java.util.List;
  * @param triggerAutocraft  open autocraft popups for missing-but-craftable
  *                          ingredients
  */
-public record PullIngredientsPayload(List<Ingredient> ingredients,
+public record PullIngredientsPayload(List<IngredientRequest> ingredients,
                                      PullMode mode,
                                      int resultsPerCraft,
                                      boolean pullAvailable,
@@ -56,10 +55,10 @@ public record PullIngredientsPayload(List<Ingredient> ingredients,
                                      boolean triggerAutocraft) implements CustomPacketPayload {
 
     public static final Type<PullIngredientsPayload> TYPE =
-            new Type<>(ResourceLocation.fromNamespaceAndPath(JackItToMe.MODID, "pull_ingredients"));
+            new Type<>(Identifier.fromNamespaceAndPath(JackItToMe.MODID, "pull_ingredients"));
 
     public static final StreamCodec<RegistryFriendlyByteBuf, PullIngredientsPayload> STREAM_CODEC = StreamCodec.composite(
-            Ingredient.CONTENTS_STREAM_CODEC.apply(ByteBufCodecs.list()),
+            IngredientRequest.LIST_STREAM_CODEC,
             PullIngredientsPayload::ingredients,
             ByteBufCodecs.VAR_INT.map(PullMode::fromOrdinal, PullMode::ordinal),
             PullIngredientsPayload::mode,

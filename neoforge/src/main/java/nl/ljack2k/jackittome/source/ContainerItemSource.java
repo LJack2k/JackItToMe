@@ -3,6 +3,9 @@ package nl.ljack2k.jackittome.source;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.inventory.AbstractContainerMenu;
+import net.minecraft.world.inventory.MerchantResultSlot;
+import net.minecraft.world.inventory.ResultContainer;
+import net.minecraft.world.inventory.ResultSlot;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
 
@@ -27,7 +30,7 @@ public class ContainerItemSource implements ItemSource {
         Inventory playerInv = player.getInventory();
         long total = 0;
         for (Slot slot : menu.slots) {
-            if (slot.container == playerInv) continue;
+            if (slot.container == playerInv || isComputedOutput(slot)) continue;
             ItemStack inSlot = slot.getItem();
             if (sameItem(template, inSlot)) {
                 total += inSlot.getCount();
@@ -53,7 +56,7 @@ public class ContainerItemSource implements ItemSource {
 
         for (Slot slot : menu.slots) {
             if (needed == 0) break;
-            if (slot.container == playerInv) continue;
+            if (slot.container == playerInv || isComputedOutput(slot)) continue;
 
             ItemStack inSlot = slot.getItem();
             if (!sameItem(template, inSlot)) continue;
@@ -115,6 +118,25 @@ public class ContainerItemSource implements ItemSource {
         if (!stack.isEmpty()) {
             player.drop(stack, false);
         }
+    }
+
+    /**
+     * Crafting-style result slots hold a preview whose real consumption of the
+     * inputs happens in {@code Slot#onTake}. Removing from them directly would
+     * mint the item for free (crafting table, anvil, stonecutter, villager
+     * trades...), so they are never a source.
+     */
+    private static boolean isComputedOutput(Slot slot) {
+        if (slot instanceof ResultSlot || slot instanceof MerchantResultSlot
+                || slot.container instanceof ResultContainer) {
+            return true;
+        }
+        // Vanilla menus (stonecutter, loom, grindstone, cartography...) build their
+        // output slot as an anonymous Slot subclass that refuses placement.
+        Class<?> c = slot.getClass();
+        return c != Slot.class && c.isAnonymousClass()
+                && c.getName().startsWith("net.minecraft.")
+                && !slot.mayPlace(slot.getItem());
     }
 
     private static boolean sameItem(ItemStack a, ItemStack b) {

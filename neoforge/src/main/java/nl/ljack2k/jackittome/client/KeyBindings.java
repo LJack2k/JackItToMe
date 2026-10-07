@@ -2,6 +2,7 @@ package nl.ljack2k.jackittome.client;
 
 import com.mojang.blaze3d.platform.InputConstants;
 import net.minecraft.client.KeyMapping;
+import net.minecraft.resources.Identifier;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
@@ -26,13 +27,13 @@ import org.lwjgl.glfw.GLFW;
  * All three use {@code GUI} conflict context — they only fire while a screen
  * is open, so they never collide with vanilla overworld bindings.
  */
-@EventBusSubscriber(modid = nl.ljack2k.jackittome.JackItToMe.MODID,
-                    value = Dist.CLIENT,
-                    bus = EventBusSubscriber.Bus.MOD)
+@EventBusSubscriber(modid = nl.ljack2k.jackittome.JackItToMe.MODID, value = Dist.CLIENT)
 public final class KeyBindings {
     private KeyBindings() {}
 
-    public static final String CATEGORY = "key.categories.jackittome";
+    /** Label comes from {@code key.category.jackittome.keys} - see Category.label(). */
+    public static final KeyMapping.Category CATEGORY = new KeyMapping.Category(
+            Identifier.fromNamespaceAndPath(nl.ljack2k.jackittome.JackItToMe.MODID, "keys"));
 
     /** Hover an item, press this key, one of that item jumps into your inventory. */
     public static final KeyMapping JACK_HOVERED = new KeyMapping(
@@ -80,6 +81,7 @@ public final class KeyBindings {
 
     @SubscribeEvent
     public static void register(RegisterKeyMappingsEvent event) {
+        event.registerCategory(CATEGORY);
         event.register(JACK_HOVERED);
         event.register(JACK_STACK);
         event.register(JACK_MAX);

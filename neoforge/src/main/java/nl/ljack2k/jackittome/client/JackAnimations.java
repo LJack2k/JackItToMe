@@ -1,10 +1,10 @@
 package nl.ljack2k.jackittome.client;
 
-import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.vertex.PoseStack;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.world.item.ItemStack;
+
+import org.joml.Matrix3x2fStack;
 
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -16,11 +16,12 @@ import java.util.List;
  * Two flavors:
  * <ul>
  *   <li><strong>Success</strong> ({@link #start}): ghost item arcs from the
- *       cursor down to the center of the hotbar over ~500ms while shrinking
- *       and fading. Fired optimistically on P press.</li>
+ *       cursor down to the center of the hotbar over ~500ms, shrinking away
+ *       as it lands. Fired optimistically on P press.</li>
  *   <li><strong>Failure</strong> ({@link #startFailure}): ghost item stays at
- *       the cursor, shakes left-right rapidly, red-tinted, fades to nothing.
- *       Fired when the server reports the pull couldn't be fulfilled.</li>
+ *       the cursor, shakes left-right rapidly under a red wash, and shrinks
+ *       to nothing. Fired when the server reports the pull couldn't be
+ *       fulfilled.</li>
  * </ul>
  * Multiple animations can run in parallel. State is purely visual — no
  * game-state coupling.
@@ -71,13 +72,20 @@ public final class JackAnimations {
         ACTIVE.add(new Anim(stack, (float) mouseX, (float) mouseY, Kind.FAILURE, 0L));
     }
 
-    public static void render(GuiGraphics g, Screen screen) {
+    /** Translucent red wash marking a pull the server refused. */
+    private static final int DENIED_WASH = 0xFF3030;
+
+    /** One animation resolved to where and how big it is this frame. */
+    private record Frame(ItemStack stack, float x, float y, float scale, float fade, boolean denied) {}
+
+    public static void render(GuiGraphicsExtractor g, Screen screen) {
         if (ACTIVE.isEmpty()) return;
 
         long now = System.currentTimeMillis();
         float targetX = screen.width / 2f;
         float targetY = screen.height - 11f;
 
+        List<Frame> frames = new ArrayList<>();
         Iterator<Anim> it = ACTIVE.iterator();
         while (it.hasNext()) {
             Anim a = it.next();
@@ -88,49 +96,57 @@ public final class JackAnimations {
                 continue;
             }
             float t = elapsed / (float) DURATION_MS;
+            frames.add(switch (a.kind) {
+                case SUCCESS -> successFrame(a, t, targetX, targetY);
+                case FAILURE -> failureFrame(a, t);
+            });
+        }
+        if (frames.isEmpty()) return;
 
-            switch (a.kind) {
-                case SUCCESS -> renderSuccess(g, a, t, targetX, targetY);
-                case FAILURE -> renderFailure(g, a, t);
-            }
+        // Two passes with a stratum between them. Within one stratum the GUI
+        // sorts elements by render pipeline rather than by call order, so a
+        // wash drawn alongside its item is not guaranteed to land on top of
+        // it; a new stratum is what actually orders the two.
+        g.nextStratum();
+        for (Frame frame : frames) {
+            withTransform(g, frame, () -> g.item(frame.stack(), 0, 0));
+        }
+        g.nextStratum();
+        for (Frame frame : frames) {
+            if (!frame.denied()) continue;
+            withTransform(g, frame, () -> g.fill(0, 0, 16, 16, argb(DENIED_WASH, 0.55f * frame.fade())));
         }
     }
 
-    private static void renderSuccess(GuiGraphics g, Anim a, float t, float targetX, float targetY) {
+    private static Frame successFrame(Anim a, float t, float targetX, float targetY) {
         float tEase = t * t;
-        float x = a.startX + (targetX - a.startX) * t;
-        float y = a.startY + (targetY - a.startY) * tEase;
-        float scale = 1f - 0.4f * t;
-        float alpha = 1f - 0.8f * t;
-
-        drawItem(g, a.stack, x, y, scale, alpha, 1f, 1f, 1f);
+        return new Frame(a.stack,
+                a.startX + (targetX - a.startX) * t,
+                a.startY + (targetY - a.startY) * tEase,
+                1f - t,
+                1f - t,
+                false);
     }
 
-    private static void renderFailure(GuiGraphics g, Anim a, float t) {
-        // Sin wave shake, 4 cycles over the duration. Amplitude shrinks as alpha fades.
+    private static Frame failureFrame(Anim a, float t) {
+        // Sin wave shake, 4 cycles over the duration, settling as it shrinks.
         float shake = (float) Math.sin(t * Math.PI * 8) * 3f * (1f - t);
-        float x = a.startX + shake;
-        float y = a.startY;
-        float scale = 1f - 0.3f * t;
-        float alpha = 1f - t;
-
-        // Red-ish tint to read as "denied" without being totally unreadable
-        drawItem(g, a.stack, x, y, scale, alpha, 1f, 0.45f, 0.45f);
+        return new Frame(a.stack, a.startX + shake, a.startY, 1f - t, 1f - t, true);
     }
 
-    private static void drawItem(GuiGraphics g, ItemStack stack, float x, float y, float scale,
-                                 float alpha, float tintR, float tintG, float tintB) {
-        PoseStack pose = g.pose();
-        pose.pushPose();
-        pose.translate(x, y, 400f);     // z above tooltips (~200)
-        pose.scale(scale, scale, 1f);
-        pose.translate(-8f, -8f, 0f);   // center the 16x16 item
+    /** Runs {@code draw} with the frame's position and scale applied, item-centered. */
+    private static void withTransform(GuiGraphicsExtractor g, Frame frame, Runnable draw) {
+        Matrix3x2fStack pose = g.pose();
+        pose.pushMatrix();
+        pose.translate(frame.x(), frame.y());
+        pose.scale(frame.scale(), frame.scale());
+        pose.translate(-8f, -8f);       // center the 16x16 item
+        draw.run();
+        pose.popMatrix();
+    }
 
-        RenderSystem.enableBlend();
-        RenderSystem.setShaderColor(tintR, tintG, tintB, alpha);
-        g.renderItem(stack, 0, 0);
-        RenderSystem.setShaderColor(1f, 1f, 1f, 1f);
-
-        pose.popPose();
+    private static int argb(int rgb, float alpha) {
+        int a = Math.clamp((int) (alpha * 255f), 0, 255);
+        return (a << 24) | (rgb & 0xFFFFFF);
     }
 }

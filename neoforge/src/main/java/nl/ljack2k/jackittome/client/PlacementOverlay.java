@@ -1,7 +1,7 @@
 package nl.ljack2k.jackittome.client;
 
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 
@@ -13,15 +13,13 @@ import net.minecraft.network.chat.Component;
  * controls on the right and along the top, where a panel would both cover them
  * and be covered by them.
  * <p>
- * Everything draws at an elevated Z so it stays above the viewer's own widgets —
- * {@code ScreenEvent.Render.Post} fires after the screen has drawn, but some
- * widgets render at a raised Z of their own and would otherwise poke through.
+ * Everything draws in a stratum of its own so it stays above the viewer's own
+ * widgets — {@code ScreenEvent.Render.Post} fires after the screen has drawn,
+ * but within a stratum the GUI orders elements by render pipeline rather than
+ * by call order, so a later call is not by itself a higher one.
  */
 public final class PlacementOverlay {
     private PlacementOverlay() {}
-
-    /** Above recipe widgets and item stacks, below vanilla tooltips (~400). */
-    private static final float Z = 350.0F;
 
     private static final int MARGIN = 6;
     private static final int PADDING = 5;
@@ -42,7 +40,7 @@ public final class PlacementOverlay {
         return visible;
     }
 
-    public static void render(GuiGraphics graphics, Screen screen, int mouseX, int mouseY) {
+    public static void render(GuiGraphicsExtractor graphics, Screen screen, int mouseX, int mouseY) {
         visible = false;
         if (screen == null || !JackConfig.PLACEMENT_KEYS.get()) return;
         visible = true;
@@ -69,21 +67,20 @@ public final class PlacementOverlay {
         panelX = MARGIN;
         panelY = Math.max(MARGIN, (screen.height - panelH) / 2);
 
-        graphics.pose().pushPose();
-        graphics.pose().translate(0, 0, Z);
+        graphics.nextStratum();
 
         graphics.fill(panelX, panelY, panelX + panelW, panelY + panelH, PANEL_BG);
-        graphics.renderOutline(panelX, panelY, panelW, panelH, GOLD);
+        graphics.outline(panelX, panelY, panelW, panelH, GOLD);
 
         int tx = panelX + PADDING;
         int ty = panelY + PADDING;
-        graphics.drawString(mc.font, title, tx, ty, GOLD, false);
+        graphics.text(mc.font, title, tx, ty, GOLD, false);
         ty += line + 2;
-        graphics.drawString(mc.font, move, tx, ty, 0xFFDDDDDD, false);
+        graphics.text(mc.font, move, tx, ty, 0xFFDDDDDD, false);
         ty += line;
-        graphics.drawString(mc.font, resetHint, tx, ty, 0xFFDDDDDD, false);
+        graphics.text(mc.font, resetHint, tx, ty, 0xFFDDDDDD, false);
         ty += line + 1;
-        graphics.drawString(mc.font, offset, tx, ty, 0xFFFFFFFF, false);
+        graphics.text(mc.font, offset, tx, ty, 0xFFFFFFFF, false);
         ty += line + 4;
 
         resetX = tx;
@@ -93,16 +90,14 @@ public final class PlacementOverlay {
 
         drawButton(graphics, mc, reset, resetX, resetY, resetW, mouseX, mouseY);
         drawButton(graphics, mc, done, doneX, doneY, doneW, mouseX, mouseY);
-
-        graphics.pose().popPose();
     }
 
-    private static void drawButton(GuiGraphics graphics, Minecraft mc, Component label,
+    private static void drawButton(GuiGraphicsExtractor graphics, Minecraft mc, Component label,
                                    int x, int y, int w, int mouseX, int mouseY) {
         boolean hovered = inside(mouseX, mouseY, x, y, w, BUTTON_HEIGHT);
         graphics.fill(x, y, x + w, y + BUTTON_HEIGHT, hovered ? BUTTON_BG_HOVER : BUTTON_BG);
-        graphics.renderOutline(x, y, w, BUTTON_HEIGHT, hovered ? GOLD : 0xFF6A6A6A);
-        graphics.drawString(mc.font, label,
+        graphics.outline(x, y, w, BUTTON_HEIGHT, hovered ? GOLD : 0xFF6A6A6A);
+        graphics.text(mc.font, label,
                 x + (w - mc.font.width(label)) / 2,
                 y + (BUTTON_HEIGHT - mc.font.lineHeight) / 2 + 1,
                 hovered ? GOLD : 0xFFFFFFFF, false);
